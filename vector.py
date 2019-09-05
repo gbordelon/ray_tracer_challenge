@@ -1,7 +1,7 @@
 import numpy as np
 from functools import lru_cache
 
-CACHE_SIZE=2048
+CACHE_SIZE=65536
 
 class ImmutablePointOrVector(object):
     def __init__(self, ndarr):

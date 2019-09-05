@@ -78,8 +78,6 @@ if __name__ == '__main__':
     file_name = './kaleidoscope_{}.'
     max_iterations = 20
     for iteration in range(max_iterations):
-        if iteration < 5:
-            continue
         file_name = './kaleidoscope_{}.'.format(iteration)
         p1.transform = scaling(0.5, 0.5, 0.5) * rotation_y(float(iteration) * np.pi / float(max_iterations))
 
@@ -89,7 +87,7 @@ if __name__ == '__main__':
 
         print('canvas construction start at {}'.format(now))
         # render the result to a canvas.
-        ca = render_multi(cam, world, 5)
+        ca = render_multi(cam, world, 4)
 
 
         now = datetime.now(timezone.utc)

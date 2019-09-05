@@ -1,3 +1,4 @@
+from canvas import *
 from matrix import *
 from shapes import *
 from vector import *
