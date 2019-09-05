@@ -1,7 +1,8 @@
-from .canvas import *
-from .matrix import *
-from .pattern import *
-from .vector import *
+from canvas import *
+from matrix import *
+from pattern import *
+from renderer import *
+from vector import *
 
 class Ray(object):
     def __init__(self, o, d):

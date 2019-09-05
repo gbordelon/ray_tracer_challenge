@@ -38,11 +38,11 @@ class Canvas(object):
         self.np_arr = np.ctypeslib.as_ctypes(np.array([[color(0,0,0) for y in range(height)] for x in range(width)]))
         self.shared_arr = sharedctypes.RawArray(self.np_arr._type_, self.np_arr)
 
-def __getitem__(self, index):
-    return np.ctypeslib.as_array(self.shared_arr)[index]
+    def __getitem__(self, index):
+        return np.ctypeslib.as_array(self.shared_arr)[index]
 
-def __setitem__(self, index, value):
-    np.ctypeslib.as_array(self.shared_arr)[index] = value
+    def __setitem__(self, index, value):
+        np.ctypeslib.as_array(self.shared_arr)[index] = value
 
 def canvas(w, h):
     """

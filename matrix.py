@@ -1,4 +1,4 @@
-from .vector import *
+from vector import *
 
 from functools import lru_cache
 import numpy as np

@@ -1,6 +1,6 @@
-from .canvas import color
-from .shape import *
-from .matrix import *
+from canvas import color
+from shapes import *
+from matrix import *
 
 import noise
 

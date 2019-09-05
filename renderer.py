@@ -1,6 +1,9 @@
-from .canvas import *
-from .matrix import *
-from .vector import *
+from matrix import *
+from shapes import *
+from vector import *
+import shapes
+import vector
+
 
 import itertools
 from multiprocessing import Pool
@@ -50,11 +53,11 @@ def default_world():
 
     """
     light = point_light(point(-10, 10, -10), color(1,1,1))
-    s1 = sphere()
+    s1 = shapes.sphere()
     s1.material.color = color(0.8,1.0,0.6)
     s1.material.diffuse = 0.7
     s1.material.specular = 0.2
-    s2 = sphere()
+    s2 = shapes.sphere()
     s2.transform = scaling(0.5,0.5,0.5)
     return World([light], [s1,s2])
 
@@ -68,8 +71,8 @@ def intersect_world(world, r):
     """
     xs = []
     for obj in world.contains:
-        xs.extend(intersect(obj, r))
-    return intersections(*xs)
+        xs.extend(shapes.intersect(obj, r))
+    return shapes.intersections(*xs)
 
 class Computations(object):
     def __init__(self, t, obj, point, eyev, normalv, reflectv, inside):
@@ -193,7 +196,7 @@ def prepare_computations(intersection, r, xs):
     >>> comps.point[2] < comps.under_point[2]
     True
     """
-    p = position(r, intersection.t)
+    p = shapes.position(r, intersection.t)
     n = normal_at(intersection.object, p)
 
     c = Computations(intersection.t,
@@ -337,7 +340,7 @@ def refracted_color(world, comps, remaining=5, ilight=0):
     direction = comps.normalv * (n_ratio * cos_i - cos_t) - \
                 comps.eyev * n_ratio
 
-    refracted_ray = ray(comps.under_point, direction)
+    refracted_ray = shapes.ray(comps.under_point, direction)
     c = color_at(world, refracted_ray, remaining - 1) * \
         comps.object.material.transparency
     return c
@@ -390,7 +393,7 @@ def reflected_color(world, comps, remaining=5, ilight=0):
     if remaining == 0 or comps.object.material.reflective == 0:
         return color(0,0,0)
 
-    reflect_ray = ray(comps.over_point, comps.reflectv)
+    reflect_ray = shapes.ray(comps.over_point, comps.reflectv)
     c = color_at(world, reflect_ray, remaining - 1, ilight)
 
     return c * comps.object.material.reflective
@@ -543,9 +546,9 @@ def is_shadowed(world, point, ilight=0):
     v = light.position - point
     distance = magnitude(v)
     direction = normalize(v)
-    r = ray(point, direction)
+    r = shapes.ray(point, direction)
     intersections = intersect_world(world, r)
-    h = hit(intersections)
+    h = shapes.hit(intersections)
 
     return h is not None and h.t < distance
 
@@ -594,7 +597,7 @@ def color_at(world, ray, remaining=5, ilight=0):
     True
     """
     xs = intersect_world(world, ray)
-    i = hit(xs)
+    i = shapes.hit(xs)
     if i is None:
         return black
     comps = prepare_computations(i, ray, xs)
@@ -724,7 +727,7 @@ def ray_for_pixel(cam, px, py):
     origin = inverse(cam.transform) * point(0,0,0)
     direction = normalize(pixel - origin)
 
-    return ray(origin, direction)
+    return shapes.ray(origin, direction)
 
 def render(cam, world):
     """
