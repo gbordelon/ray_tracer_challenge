@@ -475,6 +475,9 @@ def shearing(xy, xz, yx, yz, zx, zy):
     """
     return matrix(1,xy,xz,0, yx,1,yz,0, zx,zy,1,0, 0,0,0,1)
 
+def transform_from_yaml(obj):
+    return matrix4x4identity()
+
 def dummy_4():
     """
     >>> p1 = point(1,0,1)

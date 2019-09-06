@@ -4,15 +4,32 @@ from pattern import *
 from renderer import *
 from vector import *
 
+class Material(object):
+    def __init__(self, color=color(1,1,1), ambient=0.1, diffuse=0.9, specular=0.9, shininess=200.0, reflective=0.0, transparency=0.0, refractive_index=1.0):
+        if ambient < 0 or diffuse < 0 or specular < 0 or shininess < 0:
+            raise ValueError("Materials expect non-negative floating point values.")
+        self.color = color
+        self.ambient = np.float64(ambient)
+        self.diffuse = np.float64(diffuse)
+        self.specular = np.float64(specular)
+        self.shininess = np.float64(shininess)
+        self.pattern = None
+        self.reflective = reflective
+        self.transparency = transparency
+        self.refractive_index = refractive_index
+
+    def __repr__(self):
+        return "c: {} a: {} d: {} sp: {} sh: {}".format(self.color, self.ambient, self.diffuse, self.specular, self.shininess)
+
 class Ray(object):
     def __init__(self, o, d):
         self.origin = o
         self.direction = d
 
 class Shape(object):
-    def __init__(self):
-        self.transform = matrix4x4identity()
-        self.material = material()
+    def __init__(self, material=Material(), transform=matrix4x4identity()):
+        self.transform = transform
+        self.material = material
         self.parent = None
 
     def intersect(self, ray_original):
@@ -62,9 +79,13 @@ class Group(Shape):
         shape.parent = self
 
 class Sphere(Shape):
-    def __init__(self):
-        Shape.__init__(self)
+    def __init__(self, material, transform):
+        Shape.__init__(self, material, transform)
         self.origin = point(0,0,0)
+
+    @classmethod
+    def from_yaml(cls, obj) -> 'Sphere':
+        return cls(material=material_from_yaml(obj['material']), transform=transform_from_yaml(obj['transform']))
 
     def local_intersect(self, ray_local):
         sphere_to_ray = ray_local.origin - self.origin
@@ -660,7 +681,7 @@ def sphere():
     >>> s.transform.compare(matrix4x4identity())
     True
     """
-    return Sphere()
+    return Sphere(material(), matrix4x4identity())
 
 def glass_sphere():
     """
@@ -833,3 +854,52 @@ def normal_to_world(shape, normal):
 
 def test_shape():
     return Shape()
+
+def material():
+    """
+    >>> m = material()
+    >>> m.color == color(1,1,1)
+    array([ True,  True,  True])
+
+    >>> m.ambient == 0.1 and m.diffuse == 0.9 and m.specular == 0.9 and m.shininess == 200.0
+    True
+
+    >>> s = sphere()
+    >>> sm = s.material
+    >>> m = material()
+    >>> sm.color == m.color
+    array([ True,  True,  True])
+    >>> sm.ambient == m.ambient and sm.diffuse == m.diffuse and sm.specular == m.specular and sm.shininess == m.shininess
+    True
+
+    >>> s = sphere()
+    >>> m = material()
+    >>> m.ambient = 1
+    >>> s.material = m
+    >>> s.material.ambient == 1
+    True
+
+    >>> m = material()
+    >>> m.reflective == 0
+    True
+
+    >>> m.transparency == 0
+    True
+    >>> m.refractive_index == 1
+    True
+    """
+    return Material(color(1,1,1),0.1,0.9,0.9,200.0)
+
+def material_from_yaml(obj):
+    return Material(
+        color=color(*obj['color']),
+        diffuse=float(obj['diffuse']),
+        ambient=float(obj['ambient']),
+        specular=float(obj['specular']),
+        shininess=float(obj['shininess']),
+        reflective=float(obj['reflective']),
+        transparency=float(obj['transparency']),
+        refractive_index=float(obj['refractive-index'])
+    )
+
+

@@ -1,10 +1,9 @@
 from canvas import *
 from matrix import *
-from shapes import *
+#from shapes import *
 from vector import *
-import shapes
-import vector
 
+import shapes
 
 import itertools
 from multiprocessing import Pool
@@ -650,15 +649,29 @@ def view_transform(fr, to, up):
                          true_up[0], true_up[1], true_up[2], 0,
                          -forward[0], -forward[1], -forward[2], 0,
                          0,0,0,1)
-    return matrix_multiply(orientation, translation(-fr[0], -fr[1], -fr[2]))
+    return orientation * translation(-fr[0], -fr[1], -fr[2])
+
+def view_transform_from_yaml(fr, to, up):
+    fr = point(*fr)
+    to = point(*to)
+    up = vector(*up)
+    return view_transform(fr, to, up)
 
 class Camera(object):
-    def __init__(self, hsize, vsize, field_of_view, transform=matrix4x4identity()):
+    def __init__(self, hsize, vsize, field_of_view, xform=matrix4x4identity()):
         self.hsize = hsize
         self.vsize = vsize
-        self.field_of_view = field_of_view
-        self.transform = transform
+        self.field_of_view = float(field_of_view)
+        self.transform = xform
         self.half_width, self.half_height, self.pixel_size = self._compute_sizes()
+
+    @classmethod
+    def from_yaml(cls, obj) -> 'Camera':
+        xform = view_transform_from_yaml(obj['from'], obj['to'], obj['up'])
+        return cls(hsize=obj['width'],
+                   vsize=obj['height'],
+                   field_of_view=obj['field-of-view'],
+                   xform=xform)
 
     def _compute_sizes(self):
         half_view = np.tan(self.field_of_view / 2)
@@ -845,13 +858,17 @@ def reflect(inp, norm):
     return inp - norm * 2 * dot(inp, norm)
 
 class Light(object):
-    def __init__(self):
-        pass
+    def __init__(self, intensity):
+        self.intensity = intensity
 
 class PointLight(Light):
     def __init__(self, position, intensity):
+        Light.__init__(self, intensity)
         self.position = position
-        self.intensity = intensity
+
+    @classmethod
+    def from_yaml(cls, obj) -> 'PointLight':
+        return cls(position=point(*obj['at']), intensity=color(*obj['intensity']))
 
 def point_light(position, intensity):
     """
@@ -866,58 +883,6 @@ def point_light(position, intensity):
 
     """
     return PointLight(position, intensity)
-
-class Material(object):
-    def __init__(self, color, ambient, diffuse, specular, shininess, reflective=0.0, transparency=0.0, refractive_index=1.0):
-        if ambient < 0 or diffuse < 0 or specular < 0 or shininess < 0:
-            raise ValueError("Materials expect non-negative floating point values.")
-        self.color = color
-        self.ambient = np.float64(ambient)
-        self.diffuse = np.float64(diffuse)
-        self.specular = np.float64(specular)
-        self.shininess = np.float64(shininess)
-        self.pattern = None
-        self.reflective = reflective
-        self.transparency = transparency
-        self.refractive_index = refractive_index
-
-    def __repr__(self):
-        return "c: {} a: {} d: {} sp: {} sh: {}".format(self.color, self.ambient, self.diffuse, self.specular, self.shininess)
-
-def material():
-    """
-    >>> m = material()
-    >>> m.color == color(1,1,1)
-    array([ True,  True,  True])
-
-    >>> m.ambient == 0.1 and m.diffuse == 0.9 and m.specular == 0.9 and m.shininess == 200.0
-    True
-
-    >>> s = sphere()
-    >>> sm = s.material
-    >>> m = material()
-    >>> sm.color == m.color
-    array([ True,  True,  True])
-    >>> sm.ambient == m.ambient and sm.diffuse == m.diffuse and sm.specular == m.specular and sm.shininess == m.shininess
-    True
-
-    >>> s = sphere()
-    >>> m = material()
-    >>> m.ambient = 1
-    >>> s.material = m
-    >>> s.material.ambient == 1
-    True
-
-    >>> m = material()
-    >>> m.reflective == 0
-    True
-
-    >>> m.transparency == 0
-    True
-    >>> m.refractive_index == 1
-    True
-    """
-    return Material(color(1,1,1),0.1,0.9,0.9,200.0)
 
 black = color(0,0,0)
 def lighting(material, shape, light, point, eyev, normalv, in_shadow=False):
