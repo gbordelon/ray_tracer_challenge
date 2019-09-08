@@ -4,6 +4,8 @@ from pattern import *
 from renderer import *
 from vector import *
 
+from copy import deepcopy
+
 class Material(object):
     def __init__(self, color=color(1,1,1), ambient=0.1, diffuse=0.9, specular=0.9, shininess=200.0, reflective=0.0, transparency=0.0, refractive_index=1.0):
         if ambient < 0 or diffuse < 0 or specular < 0 or shininess < 0:
@@ -20,7 +22,7 @@ class Material(object):
 
     @classmethod
     def from_yaml(cls, obj) -> 'Material':
-        c = color(0,0,0)
+        c = color(1,1,1)
         diffuse = 0.1
         ambient = 0.9
         specular = 0.9
@@ -112,7 +114,7 @@ class Shape(object):
         return normal
 
     def __repr__(self):
-        return "Shape: (Material: {} {} {} {} {} {} {} {} {}), Transform: (), Parent: ()".format(
+        return "Shape: (Material: {} {} {} {} {} {} {} {} {}), Transform: {}".format(
             self.material.color,
             self.material.ambient,
             self.material.diffuse,
@@ -122,19 +124,18 @@ class Shape(object):
             self.material.reflective,
             self.material.transparency,
             self.material.refractive_index,
-            self.transform,
-            self.parent)
+            self.transform)
 
 
 class Group(Shape):
     def __init__(self, material, transform, children):
         Shape.__init__(self, material, transform)
         self.children = children
+        for child in self.children:
+            child.parent = self
 
     @classmethod
     def _recursive_helper(cls, obj, defines) -> 'Shape':
-        if 'material' not in obj:
-            obj['material'] = {}
         if 'transform' not in obj:
             obj['transform'] = []
 
@@ -149,22 +150,18 @@ class Group(Shape):
         elif obj["add"] == "cylinder":
             return Cylinder.from_yaml(obj)
         elif obj["add"] == "group":
+            if "material" in obj:
+                for child in obj["children"]:
+                    if "material" not in child:
+                        child["material"] = deepcopy(obj["material"])
             return Group.from_yaml(obj, defines)
-        elif obj["add"] in defines:
-            return Group._recursive_helper(defines[obj["add"]], defines)
         return None
 
     @classmethod
     def from_yaml(cls, tree, defines) -> 'Group':
-        if 'children' not in tree:
-            return cls(set())
-
         mat = Material()
         xform = matrix4x4identity()
-        shapes = set()
-        for obj in tree['children']:
-            if "add" in obj:
-                shapes.add(Group._recursive_helper(obj, defines))
+        children = set()
 
         if 'material' in tree:
             mat = Material.from_yaml(tree['material'])
@@ -172,7 +169,11 @@ class Group(Shape):
         if 'transform' in tree:
             xform = Transform.from_yaml(tree['transform'])
 
-        return cls(material=mat, transform=xform, children=shapes)
+        for obj in tree['children']:
+            if "add" in obj:
+                children.add(Group._recursive_helper(obj, defines))
+
+        return cls(material=mat, transform=xform, children=children)
 
     def local_intersect(self, ray_local):
         xs = []
@@ -187,7 +188,7 @@ class Group(Shape):
         shape.parent = self
 
     def __repr__(self):
-        return "Group: (Children: {}) (Material: {} {} {} {} {} {} {} {} {}), Transform: (), Parent: ()".format(
+        return "Group: (Children: {}) (Material: {} {} {} {} {} {} {} {} {}), Transform: {}".format(
             self.children,
             self.material.color,
             self.material.ambient,
@@ -198,8 +199,7 @@ class Group(Shape):
             self.material.reflective,
             self.material.transparency,
             self.material.refractive_index,
-            self.transform,
-            self.parent)
+            self.transform)
 
 class Sphere(Shape):
     def __init__(self, material, transform):

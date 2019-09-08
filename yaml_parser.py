@@ -41,7 +41,26 @@ def yaml_file_to_world_objects(file_path):
                 new_parent_value[k] = child_value[k]
             defines[obj_name] = new_parent_value
 
-    # replace occurrences of previous defines in the tree
+    expand_defines_in_tree(tree, defines)
+
+    for obj in tree:
+        if "add" in obj:
+            if obj["add"] == "camera":
+                rv['camera'] = Camera.from_yaml(obj)
+            elif obj["add"] == "light":
+                rv['lights'].append(PointLight.from_yaml(obj))
+            else:
+                possible_item = recursive_add(obj, defines)
+                if possible_item is not None:
+                    rv['world'].append(possible_item)
+
+    return rv
+
+def recursive_add(tree, defines):
+    return Group._recursive_helper(tree, defines)
+
+# replace occurrences of previous defines in the tree
+def expand_defines_in_tree(tree, defines):
     for obj in tree:
         for k in defines:
             if "value" in obj and k in obj["value"]:
@@ -80,38 +99,13 @@ def yaml_file_to_world_objects(file_path):
                             obj["value"].insert(0, item)
                 else:
                     obj["value"] = deepcopy(defines[k])
-
-    # TODO handle groups and I should be able to handle group.yml. This will require changes to the above code, I think
-    for obj in tree:
-        if "add" in obj:
-            if obj["add"] == "camera":
-                rv['camera'] = Camera.from_yaml(obj)
-            elif obj["add"] == "light":
-                rv['lights'].append(PointLight.from_yaml(obj))
-            else:
-                possible_item = recursive_add(obj, defines)
-                if possible_item is not None:
-                    rv['world'].append(possible_item)
-
-    return rv
-
-def recursive_add(tree, defines):
-    rv = None
-    if tree["add"] == "sphere":
-        rv = Sphere.from_yaml(tree)
-    elif tree["add"] == "plane":
-        rv = Plane.from_yaml(tree)
-    elif tree["add"] == "cube":
-        rv = Cube.from_yaml(tree)
-    elif tree["add"] == "cone":
-        rv = Cone.from_yaml(tree)
-    elif tree["add"] == "cylinder":
-        rv = Cylinder.from_yaml(tree)
-    elif tree["add"] == "group":
-        rv = Group.from_yaml(tree, defines)
-    elif tree["add"] in defines and type(defines[tree["add"]]) == dict:
-        rv = recursive_add(defines[tree["add"]], defines)
-    return rv
+            if "add" in obj and k == obj["add"]:
+                new_defines = deepcopy(defines[k])
+                if "add" in new_defines and new_defines["add"] == "group" and "children" in new_defines:
+                    expand_defines_in_tree(new_defines["children"], defines)
+                for l in new_defines:
+                    if l != "material" and l != "transform":
+                        obj[l] = new_defines[l]
 
 if __name__ == '__main__':
     x = yaml_file_to_world_objects("group.yml")
