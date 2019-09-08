@@ -82,6 +82,55 @@ def matrix4helper(r1, r2, r3, r4):
 def matrix4x4identity():
     return matrix4x4(1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1)
 
+class Transform(object):
+    @classmethod
+    def translate(cls, x, y, z):
+        return matrix(1,0,0,x, 0,1,0,y, 0,0,1,z, 0,0,0,1)
+
+    @classmethod
+    def scale(cls, x, y, z):
+        return matrix(x,0,0,0, 0,y,0,0, 0,0,z,0, 0,0,0,1)
+
+    @classmethod
+    def rotate_x(cls, rad):
+        return matrix(1,0,0,0, 0,np.cos(rad),-np.sin(rad),0, 0,np.sin(rad),np.cos(rad),0, 0,0,0,1)
+
+    @classmethod
+    def rotate_y(cls, rad):
+        return matrix(np.cos(rad),0,np.sin(rad),0, 0,1,0,0, -np.sin(rad),0,np.cos(rad),0, 0,0,0,1)
+
+    @classmethod
+    def rotate_z(cls, rad):
+        return matrix(np.cos(rad),-np.sin(rad),0,0, np.sin(rad),np.cos(rad),0,0, 0,0,1,0, 0,0,0,1)
+
+    @classmethod
+    def shear(cls, xy, xz, yx, yz, zx, zy):
+        return matrix(1,xy,xz,0, yx,1,yz,0, zx,zy,1,0, 0,0,0,1)
+
+    @classmethod
+    def from_yaml(cls, obj): # assume a list of lists
+        xlations = []
+        for l in obj:
+            if l[0] == 'translate':
+                xlations.append(cls.translate(l[1], l[2], l[3]))
+            elif l[0] == 'scale':
+                xlations.append(cls.scale(l[1], l[2], l[3]))
+            elif l[0] == 'rotate-x':
+                xlations.append(cls.rotate_x(l[1]))
+            elif l[0] == 'rotate-y':
+                xlations.append(cls.rotate_y(l[1]))
+            elif l[0] == 'rotate-z':
+                xlations.append(cls.rotate_z(l[1]))
+            elif l[0] == 'shear':
+                xlations.append(cls.shear(l[1], l[2], l[3], l[4], l[5], l[6]))
+            else:
+                raise ValueError('Unknown translation type: {}'.format(l[0]))
+        acc = matrix4x4identity()
+        for xlation in xlations:
+            tmp = xlation * acc
+            acc = tmp
+        return acc
+
 def matrix3x3(a1, a2, a3, b1, b2, b3, c1, c2, c3):
     """
     >>> m = matrix(-3,5,0, 1,-2,-7, 0,1,1)
@@ -476,7 +525,7 @@ def shearing(xy, xz, yx, yz, zx, zy):
     return matrix(1,xy,xz,0, yx,1,yz,0, zx,zy,1,0, 0,0,0,1)
 
 def transform_from_yaml(obj):
-    return matrix4x4identity()
+    return
 
 def dummy_4():
     """

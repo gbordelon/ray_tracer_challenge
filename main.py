@@ -279,7 +279,7 @@ def yaml_test():
     ppm_ext = 'ppm'
     from yaml_parser import yaml_file_to_world_objects
     w = default_world()
-    objs = yaml_file_to_world_objects('./cover.yml')
+    objs = yaml_file_to_world_objects('./group.yml')
     w.contains = objs['world']
     w.lights = objs['lights']
 

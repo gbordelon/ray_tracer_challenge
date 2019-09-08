@@ -88,6 +88,9 @@ class Computations(object):
         self.n1 = None
         self.n2 = None
 
+    def __repr__(self):
+        return "Computation: {} ({}) {} {} {} {} {} {} {} {} {}".format(self.t, self.object, self.point, self.eyev, self.normalv, self.inside, self.reflectv, self.over_point, self.under_point, self.n1, self.n2)
+
 def prepare_computations(intersection, r, xs):
     """
     >>> r = ray(point(0,0,-5), vector(0,0,1))
@@ -599,7 +602,7 @@ def color_at(world, ray, remaining=5, ilight=0):
     xs = intersect_world(world, ray)
     i = shapes.hit(xs)
     if i is None:
-        return black
+        return color(0,0,0)
     comps = prepare_computations(i, ray, xs)
     return shade_hit(world, comps, remaining, ilight)
 

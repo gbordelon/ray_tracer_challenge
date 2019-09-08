@@ -1,5 +1,5 @@
 from renderer import Camera, PointLight
-from shapes import Sphere
+from shapes import Sphere, Plane, Cube, Cone, Cylinder, Group
 
 from copy import deepcopy
 import yaml
@@ -81,29 +81,38 @@ def yaml_file_to_world_objects(file_path):
                 else:
                     obj["value"] = deepcopy(defines[k])
 
-    # TODO handle plane and cube and i should be able to render cover.yml
     # TODO handle groups and I should be able to handle group.yml. This will require changes to the above code, I think
     for obj in tree:
-        print(obj)
         if "add" in obj:
             if obj["add"] == "camera":
                 rv['camera'] = Camera.from_yaml(obj)
             elif obj["add"] == "light":
                 rv['lights'].append(PointLight.from_yaml(obj))
-            elif obj["add"] == "sphere":
-                rv['world'].append(Sphere.from_yaml(obj))
-            elif obj["add"] == "plane":
-                pass
-            elif obj["add"] == "cube":
-                pass
-            elif obj["add"] == "cone":
-                pass
-            elif obj["add"] == "cylinder":
-                pass
-            elif obj["add"] == "group":
-                pass
+            else:
+                possible_item = recursive_add(obj, defines)
+                if possible_item is not None:
+                    rv['world'].append(possible_item)
+
+    return rv
+
+def recursive_add(tree, defines):
+    rv = None
+    if tree["add"] == "sphere":
+        rv = Sphere.from_yaml(tree)
+    elif tree["add"] == "plane":
+        rv = Plane.from_yaml(tree)
+    elif tree["add"] == "cube":
+        rv = Cube.from_yaml(tree)
+    elif tree["add"] == "cone":
+        rv = Cone.from_yaml(tree)
+    elif tree["add"] == "cylinder":
+        rv = Cylinder.from_yaml(tree)
+    elif tree["add"] == "group":
+        rv = Group.from_yaml(tree, defines)
+    elif tree["add"] in defines and type(defines[tree["add"]]) == dict:
+        rv = recursive_add(defines[tree["add"]], defines)
     return rv
 
 if __name__ == '__main__':
-    x = yaml_file_to_world_objects("cover.yml")
+    x = yaml_file_to_world_objects("group.yml")
     print(x)

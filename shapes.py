@@ -18,8 +18,60 @@ class Material(object):
         self.transparency = transparency
         self.refractive_index = refractive_index
 
+    @classmethod
+    def from_yaml(cls, obj) -> 'Material':
+        c = color(0,0,0)
+        diffuse = 0.1
+        ambient = 0.9
+        specular = 0.9
+        shininess = 200.0
+        reflective = 0.9
+        transparency = 0.0
+        refractive_index = 1.0
+
+        if 'color' in obj:
+            c = color(*obj['color'])
+
+        if 'diffuse' in obj:
+            diffuse = float(obj['diffuse'])
+
+        if 'ambient' in obj:
+            ambient = float(obj['ambient'])
+
+        if 'specular' in obj:
+            specular = float(obj['specular'])
+
+        if 'shininess' in obj:
+            shininess = float(obj['shininess'])
+
+        if 'reflective' in obj:
+            reflective = float(obj['reflective'])
+
+        if 'transparency' in obj:
+            transparency = float(obj['transparency'])
+
+        if 'refractive-index' in obj:
+            refractive_index = float(obj['refractive-index'])
+
+        return Material(color=c,
+                        diffuse=diffuse,
+                        ambient=ambient,
+                        specular=specular,
+                        shininess=shininess,
+                        reflective=reflective,
+                        transparency=transparency,
+                        refractive_index=refractive_index)
+
     def __repr__(self):
-        return "c: {} a: {} d: {} sp: {} sh: {}".format(self.color, self.ambient, self.diffuse, self.specular, self.shininess)
+        return "c: {} a: {} d: {} sp: {} sh: {} refl: {} trans: {} refr: {}".format(
+            self.color,
+            self.ambient,
+            self.diffuse,
+            self.specular,
+            self.shininess,
+            self.reflective,
+            self.transparency,
+            self.refractive_index)
 
 class Ray(object):
     def __init__(self, o, d):
@@ -59,12 +111,68 @@ class Shape(object):
 
         return normal
 
+    def __repr__(self):
+        return "Shape: (Material: {} {} {} {} {} {} {} {} {}), Transform: (), Parent: ()".format(
+            self.material.color,
+            self.material.ambient,
+            self.material.diffuse,
+            self.material.specular,
+            self.material.shininess,
+            self.material.pattern,
+            self.material.reflective,
+            self.material.transparency,
+            self.material.refractive_index,
+            self.transform,
+            self.parent)
 
-# TODO possibly use a set for children instead of list?
+
 class Group(Shape):
-    def __init__(self):
-        Shape.__init__(self)
-        self.children = []
+    def __init__(self, material, transform, children):
+        Shape.__init__(self, material, transform)
+        self.children = children
+
+    @classmethod
+    def _recursive_helper(cls, obj, defines) -> 'Shape':
+        if 'material' not in obj:
+            obj['material'] = {}
+        if 'transform' not in obj:
+            obj['transform'] = []
+
+        if obj["add"] == "sphere":
+            return Sphere.from_yaml(obj)
+        elif obj["add"] == "plane":
+            return Plane.from_yaml(obj)
+        elif obj["add"] == "cube":
+            return Cube.from_yaml(obj)
+        elif obj["add"] == "cone":
+            return Cone.from_yaml(obj)
+        elif obj["add"] == "cylinder":
+            return Cylinder.from_yaml(obj)
+        elif obj["add"] == "group":
+            return Group.from_yaml(obj, defines)
+        elif obj["add"] in defines:
+            return Group._recursive_helper(defines[obj["add"]], defines)
+        return None
+
+    @classmethod
+    def from_yaml(cls, tree, defines) -> 'Group':
+        if 'children' not in tree:
+            return cls(set())
+
+        mat = Material()
+        xform = matrix4x4identity()
+        shapes = set()
+        for obj in tree['children']:
+            if "add" in obj:
+                shapes.add(Group._recursive_helper(obj, defines))
+
+        if 'material' in tree:
+            mat = Material.from_yaml(tree['material'])
+
+        if 'transform' in tree:
+            xform = Transform.from_yaml(tree['transform'])
+
+        return cls(material=mat, transform=xform, children=shapes)
 
     def local_intersect(self, ray_local):
         xs = []
@@ -75,8 +183,23 @@ class Group(Shape):
     def add_child(self, shape):
         if self is shape:
             raise ValueError("Don't add a group to its own children collection.")
-        self.children.append(shape)
+        self.children.add(shape)
         shape.parent = self
+
+    def __repr__(self):
+        return "Group: (Children: {}) (Material: {} {} {} {} {} {} {} {} {}), Transform: (), Parent: ()".format(
+            self.children,
+            self.material.color,
+            self.material.ambient,
+            self.material.diffuse,
+            self.material.specular,
+            self.material.shininess,
+            self.material.pattern,
+            self.material.reflective,
+            self.material.transparency,
+            self.material.refractive_index,
+            self.transform,
+            self.parent)
 
 class Sphere(Shape):
     def __init__(self, material, transform):
@@ -85,7 +208,7 @@ class Sphere(Shape):
 
     @classmethod
     def from_yaml(cls, obj) -> 'Sphere':
-        return cls(material=material_from_yaml(obj['material']), transform=transform_from_yaml(obj['transform']))
+        return cls(material=Material.from_yaml(obj['material']), transform=Transform.from_yaml(obj['transform']))
 
     def local_intersect(self, ray_local):
         sphere_to_ray = ray_local.origin - self.origin
@@ -104,9 +227,13 @@ class Sphere(Shape):
 
 
 class Plane(Shape):
-    def __init__(self):
-        Shape.__init__(self)
+    def __init__(self, material, transform):
+        Shape.__init__(self, material, transform)
         self.normalv = vector(0,1,0)
+
+    @classmethod
+    def from_yaml(cls, obj) -> 'Plane':
+        return cls(material=Material.from_yaml(obj['material']), transform=Transform.from_yaml(obj['transform']))
 
     def local_intersect(self, ray_local):
         if abs(ray_local.direction[1]) < EPSILON:
@@ -120,8 +247,12 @@ class Plane(Shape):
 
 
 class Cube(Shape):
-    def __init__(self):
-        Shape.__init__(self)
+    def __init__(self, material, transform):
+        Shape.__init__(self, material, transform)
+
+    @classmethod
+    def from_yaml(cls, obj) -> 'Cube':
+        return cls(material=Material.from_yaml(obj['material']), transform=Transform.from_yaml(obj['transform']))
 
     def local_intersect(self, ray_local):
         xtmin, xtmax = self._check_axis(ray_local.origin[0], ray_local.direction[0])
@@ -164,11 +295,20 @@ class Cube(Shape):
         return tmin, tmax
 
 class Cone(Shape):
-    def __init__(self, minimum=-np.inf, maximum=np.inf, closed=False):
-        Shape.__init__(self)
-        self.minimum = minimum
-        self.maximum = maximum
+    def __init__(self, material, transform, minimum=-np.inf, maximum=np.inf, closed=False):
+        Shape.__init__(self, material, transform)
+        self.minimum = float(minimum)
+        self.maximum = float(maximum)
         self.closed = closed
+
+    @classmethod
+    def from_yaml(cls, obj) -> 'Cone':
+        b = obj['closed']
+        return cls(material=Material.from_yaml(obj['material']),
+                   transform=Transform.from_yaml(obj['transform']),
+                   minimum=obj['min'],
+                   maximum=obj['max'],
+                   closed=b)
 
     def local_intersect(self, ray_local):
         xs = []
@@ -243,11 +383,20 @@ class Cone(Shape):
 
 
 class Cylinder(Shape):
-    def __init__(self, minimum=-np.inf, maximum=np.inf, closed=False):
-        Shape.__init__(self)
+    def __init__(self, material, transform, minimum=-np.inf, maximum=np.inf, closed=False):
+        Shape.__init__(self, material, transform)
         self.minimum = minimum
         self.maximum = maximum
         self.closed = closed
+
+    @classmethod
+    def from_yaml(cls, obj) -> 'Cylinder':
+        b = obj['closed']
+        return cls(material=Material.from_yaml(obj['material']),
+                   transform=Transform.from_yaml(obj['transform']),
+                   minimum=obj['min'],
+                   maximum=obj['max'],
+                   closed=b)
 
     def local_intersect(self, ray_local):
         a = ray_local.direction[0] ** 2 + ray_local.direction[2] ** 2
@@ -889,17 +1038,4 @@ def material():
     True
     """
     return Material(color(1,1,1),0.1,0.9,0.9,200.0)
-
-def material_from_yaml(obj):
-    return Material(
-        color=color(*obj['color']),
-        diffuse=float(obj['diffuse']),
-        ambient=float(obj['ambient']),
-        specular=float(obj['specular']),
-        shininess=float(obj['shininess']),
-        reflective=float(obj['reflective']),
-        transparency=float(obj['transparency']),
-        refractive_index=float(obj['refractive-index'])
-    )
-
 
