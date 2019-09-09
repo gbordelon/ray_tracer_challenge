@@ -23,11 +23,11 @@ class Material(object):
     @classmethod
     def from_yaml(cls, obj) -> 'Material':
         c = color(1,1,1)
-        diffuse = 0.1
-        ambient = 0.9
+        ambient = 0.1
+        diffuse = 0.9
         specular = 0.9
         shininess = 200.0
-        reflective = 0.9
+        reflective = 0.0
         transparency = 0.0
         refractive_index = 1.0
 
@@ -90,9 +90,9 @@ class Shape(object):
         ray = transform(ray_original, inverse(self.transform))
         return self.local_intersect(ray)
 
-    def normal_at(self, world_point):
+    def normal_at(self, world_point, hit=None):
         local_point = self.world_to_object(world_point)
-        local_normal = self.local_normal_at(local_point)
+        local_normal = self.local_normal_at(local_point, hit)
         world_normal = self.normal_to_world(local_normal)
         n = vector(world_normal[0], world_normal[1], world_normal[2]) # make sure normal[3] is 0
         return normalize(n)
@@ -156,6 +156,10 @@ class Group(Shape):
                     if "material" not in child:
                         child["material"] = deepcopy(obj["material"])
             return Group.from_yaml(obj, defines)
+        elif obj["add"] == "obj":
+            from obj_parser import OBJParser
+            return OBJParser.from_yaml(obj, defines)
+
         return None
 
     @classmethod
@@ -189,11 +193,11 @@ class Group(Shape):
             self.children.update(shapes)
             for sh in shapes:
                 sh.parent = self
-                sh.material = self.material
+                #sh.material = self.material
         else:
             self.children.add(shapes)
             shapes.parent = self
-            shapes.material = self.material
+            #shapes.material = self.material
 
     def __repr__(self):
         return "Group: (Children: {}) (Material: {} {} {} {} {} {} {} {} {}), Transform: {}".format(
@@ -230,7 +234,7 @@ class Sphere(Shape):
         return intersections(Intersection((-b - np.sqrt(discriminant)) / (2 * a), self),
                              Intersection((-b + np.sqrt(discriminant)) / (2 * a), self))
 
-    def local_normal_at(self, local_point):
+    def local_normal_at(self, local_point, hit=None):
         return local_point - point(0,0,0)
 
 
@@ -250,7 +254,7 @@ class Plane(Shape):
         t = -ray_local.origin[1] / ray_local.direction[1]
         return intersections(Intersection(t, self))
 
-    def local_normal_at(self, local_point):
+    def local_normal_at(self, local_point, hit=None):
         return self.normalv
 
 
@@ -274,7 +278,7 @@ class Cube(Shape):
             return []
         return intersections(intersection(tmin, self), intersection(tmax, self))
 
-    def local_normal_at(self, local_point):
+    def local_normal_at(self, local_point, hit=None):
         abs_x = abs(local_point[0])
         abs_y = abs(local_point[1])
         abs_z = abs(local_point[2])
@@ -358,7 +362,7 @@ class Cone(Shape):
 
         return intersections(*xs)
 
-    def local_normal_at(self, local_point):
+    def local_normal_at(self, local_point, hit=None):
         dist = local_point[0] ** 2 + local_point[2] ** 2
         if dist < 1 and (self.maximum - EPSILON) < local_point[1]:
             return vector(0,1,0)
@@ -439,7 +443,7 @@ class Cylinder(Shape):
 
         return intersections(*xs)
 
-    def local_normal_at(self, local_point):
+    def local_normal_at(self, local_point, hit=None):
         dist = local_point[0] ** 2 + local_point[2] ** 2
         if dist < 1 and (self.maximum - EPSILON) < local_point[1]:
             return vector(0,1,0)
@@ -477,7 +481,7 @@ class Triangle(Shape):
         self.e2 = p3 - p1
         self.normal = normalize(cross(self.e2, self.e1))
 
-    def local_normal_at(self, pt):
+    def local_normal_at(self, local_point, hit=None):
         return self.normal
 
     def local_intersect(self, r):
@@ -503,10 +507,49 @@ class Triangle(Shape):
     def __repr__(self):
         return '{} {} {} {} {} {}'.format(self.p1, self.p2, self.p3, self.e1, self.e2, self.normal)
 
+
+class SmoothTriangle(Shape):
+    def __init__(self, material, transform, p1, p2, p3, n1, n2, n3):
+        Shape.__init__(self, material, transform)
+        self.p1 = p1
+        self.p2 = p2
+        self.p3 = p3
+        self.n1 = n1
+        self.n2 = n2
+        self.n3 = n3
+        self.e1 = p2 - p1
+        self.e2 = p3 - p1
+
+    def local_normal_at(self, local_point, hit):
+        return self.n2 * hit.u + self.n3 * hit.v +  self.n1 * (1 - hit.u - hit.v)
+
+    def local_intersect(self, r):
+        dir_cross_e2 = cross(r.direction, self.e2)
+        det = dot(self.e1, dir_cross_e2)
+        if abs(det) < EPSILON:
+            return []
+
+        f = 1.0 / det
+        p1_to_origin = r.origin - self.p1
+        u = f * dot(p1_to_origin, dir_cross_e2)
+        if u < 0 or u > 1:
+            return []
+
+        origin_cross_e1 = cross(p1_to_origin, self.e1)
+        v = f * dot(r.direction, origin_cross_e1)
+        if v < 0 or (u + v) > 1:
+            return []
+
+        t = f * dot(self.e2, origin_cross_e1)
+        return intersections(intersection_with_uv(t, self, u, v))
+
+
 class Intersection(object):
-    def __init__(self, t, obj):
+    def __init__(self, t, obj, u=None, v=None):
         self.t = t
         self.object = obj
+        self.u = u
+        self.v = v
 
 
 def triangle(p1,p2,p3):
@@ -965,6 +1008,9 @@ def intersect(shape, ray):
     True
     """
     return shape.intersect(ray)
+
+def intersection_with_uv(t, obj, u, v):
+    return Intersection(t, obj, u, v)
 
 def intersection(t, obj):
     """

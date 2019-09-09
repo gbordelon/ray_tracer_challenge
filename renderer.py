@@ -200,7 +200,7 @@ def prepare_computations(intersection, r, xs):
     True
     """
     p = shapes.position(r, intersection.t)
-    n = normal_at(intersection.object, p)
+    n = normal_at(intersection.object, p, intersection)
 
     c = Computations(intersection.t,
                      intersection.object,
@@ -802,7 +802,7 @@ def render_multi(cam, world, num_threads=4):
 
     return np.ctypeslib.as_array(image.shared_arr)
 
-def normal_at(shape, world_point):
+def normal_at(shape, world_point, hit):
     """
     >>> s = sphere()
     >>> n = normal_at(s, point(1,0,0))
@@ -842,7 +842,7 @@ def normal_at(shape, world_point):
     >>> n.compare(vector(0, 0.97014, -0.242535625))
     True
     """
-    return shape.normal_at(world_point)
+    return shape.normal_at(world_point, hit)
 
 def reflect(inp, norm):
     """

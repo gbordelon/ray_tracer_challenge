@@ -301,8 +301,7 @@ def yaml_test(yaml_file_name, output_file_name):
     with open(output_file_name + 'ppm', 'wb') as f:
         f.write(ppm)
 
-def obj_test(obj_file_path, yaml_file_path, output_file_path):
-    from obj_parser import obj_file_to_group
+def obj_test(yaml_file_path, output_file_path):
     from yaml_parser import yaml_file_to_world_objects
 
     w = default_world()
@@ -312,14 +311,10 @@ def obj_test(obj_file_path, yaml_file_path, output_file_path):
 
     yaml_objs = yaml_file_to_world_objects(yaml_file_path)
 
-    mesh_objs = obj_file_to_group(obj_file_path, mat)
-    mesh_objs.transform = Transform.rotate_x(-np.pi/2)
-
     cam = yaml_objs['camera']
     w.lights = yaml_objs['lights']
 
     w.contains.extend(yaml_objs['world'])
-    w.contains.append(mesh_objs)
 
     now = datetime.now(timezone.utc)
     epoch = datetime(1970, 1, 1, tzinfo=timezone.utc) # use POSIX epoch
@@ -338,12 +333,10 @@ def obj_test(obj_file_path, yaml_file_path, output_file_path):
     with open(output_file_path, 'wb') as f:
         f.write(ppm)
 
-# TODO add OBJ support to yaml parser. This will allow me to combine materials and transforms with meshes
 if __name__ == '__main__':
     input_yaml_file_path = './obj_file_test.yml'
-    input_obj_file_path = './teapot.obj'
     output_file_path = './obj_file_test.ppm'
-    obj_test(input_obj_file_path, input_yaml_file_path, output_file_path)
+    obj_test(input_yaml_file_path, output_file_path)
 
     im = Image.open(output_file_path, 'r')
     im.save(output_file_path[:-3] + 'jpg')
