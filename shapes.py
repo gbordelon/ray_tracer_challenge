@@ -126,6 +126,7 @@ class Shape(object):
             self.material.refractive_index,
             self.transform)
 
+# TODO implement TriangleMesh aggregate shape
 
 class Group(Shape):
     def __init__(self, material, transform, children):
@@ -181,11 +182,18 @@ class Group(Shape):
             xs.extend(shape.intersect(ray_local))
         return intersections(*xs)
 
-    def add_child(self, shape):
-        if self is shape:
+    def add_child(self, shapes):
+        if self is shapes:
             raise ValueError("Don't add a group to its own children collection.")
-        self.children.add(shape)
-        shape.parent = self
+        if type(shapes) == set or type(shapes) == list:
+            self.children.update(shapes)
+            for sh in shapes:
+                sh.parent = self
+                sh.material = self.material
+        else:
+            self.children.add(shapes)
+            shapes.parent = self
+            shapes.material = self.material
 
     def __repr__(self):
         return "Group: (Children: {}) (Material: {} {} {} {} {} {} {} {} {}), Transform: {}".format(
@@ -459,11 +467,58 @@ class Cylinder(Shape):
             xs.append(intersection(t, self))
 
 
+class Triangle(Shape):
+    def __init__(self, material, transform, p1, p2, p3):
+        Shape.__init__(self, material, transform)
+        self.p1 = p1
+        self.p2 = p2
+        self.p3 = p3
+        self.e1 = p2 - p1
+        self.e2 = p3 - p1
+        self.normal = normalize(cross(self.e2, self.e1))
+
+    def local_normal_at(self, pt):
+        return self.normal
+
+    def local_intersect(self, r):
+        dir_cross_e2 = cross(r.direction, self.e2)
+        det = dot(self.e1, dir_cross_e2)
+        if abs(det) < EPSILON:
+            return []
+
+        f = 1.0 / det
+        p1_to_origin = r.origin - self.p1
+        u = f * dot(p1_to_origin, dir_cross_e2)
+        if u < 0 or u > 1:
+            return []
+
+        origin_cross_e1 = cross(p1_to_origin, self.e1)
+        v = f * dot(r.direction, origin_cross_e1)
+        if v < 0 or (u + v) > 1:
+            return []
+
+        t = f * dot(self.e2, origin_cross_e1)
+        return intersections(intersection(t, self))
+
+    def __repr__(self):
+        return '{} {} {} {} {} {}'.format(self.p1, self.p2, self.p3, self.e1, self.e2, self.normal)
+
 class Intersection(object):
     def __init__(self, t, obj):
         self.t = t
         self.object = obj
 
+
+def triangle(p1,p2,p3):
+    """
+    >>> p1 = point(0,1,0)
+    >>> p2 = point(-1,0,0)
+    >>> p3 = point(1,0,0)
+    >>> t = triangle(p1,p2,p3)
+    >>> t.p1.compare(p1) and t.p2.compare(p2) and t.p3.compare(p3) and t.e1.compare(vector(-1,-1,0)) and t.e2.compare(vector(1,-1,0)) and t.normal.compare(vector(0,0,-1))
+    True
+    """
+    return Triangle(Material(), matrix4x4identity(), p1, p2, p3)
 
 def group():
     """
@@ -1038,4 +1093,9 @@ def material():
     True
     """
     return Material(color(1,1,1),0.1,0.9,0.9,200.0)
+
+if __name__ == '__main__':
+    t = Triangle(Material(), matrix4x4identity(), point(0,1,0), point(-1,0,0), point(1,0,0))
+    r = ray(point(0,0.5,-2), vector(0,0,1))
+    print(len(t.local_intersect(r)))
 
