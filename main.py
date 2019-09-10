@@ -333,9 +333,43 @@ def obj_test(yaml_file_path, output_file_path):
     with open(output_file_path, 'wb') as f:
         f.write(ppm)
 
+def csg_test(yaml_file_path, output_file_path):
+    from yaml_parser import yaml_file_to_world_objects
+
+    w = default_world()
+    w.contains = []
+    mat = Material()
+    mat.color = color(1,0,0)
+
+    yaml_objs = yaml_file_to_world_objects(yaml_file_path)
+
+    cam = yaml_objs['camera']
+    w.lights = yaml_objs['lights']
+
+    w.contains.extend(yaml_objs['world'])
+
+    now = datetime.now(timezone.utc)
+    epoch = datetime(1970, 1, 1, tzinfo=timezone.utc) # use POSIX epoch
+    posix_timestamp_micros_before = (now - epoch) / timedelta(microseconds=1)
+
+    print('canvas construction start at {}'.format(now))
+    ca = render_multi(cam, w, 4)
+
+    now = datetime.now(timezone.utc)
+    epoch = datetime(1970, 1, 1, tzinfo=timezone.utc) # use POSIX epoch
+    posix_timestamp_micros_after = (now - epoch) / timedelta(microseconds=1)
+    delta = posix_timestamp_micros_after - posix_timestamp_micros_before
+    print('canvas constructed in {} seconds.'.format(delta/1000000))
+
+    ppm = construct_ppm(ca)
+    with open(output_file_path, 'wb') as f:
+        f.write(ppm)
+
+
+
 if __name__ == '__main__':
-    input_yaml_file_path = './obj_file_test.yml'
-    output_file_path = './obj_file_test.ppm'
+    input_yaml_file_path = './csg_test.yml'
+    output_file_path = './csg_test.ppm'
     obj_test(input_yaml_file_path, output_file_path)
 
     im = Image.open(output_file_path, 'r')

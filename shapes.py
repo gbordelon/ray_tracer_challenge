@@ -86,6 +86,45 @@ class Shape(object):
         self.material = material
         self.parent = None
 
+    @classmethod
+    def _recursive_helper(cls, obj, defines) -> 'Shape':
+        if 'transform' not in obj:
+            obj['transform'] = []
+
+        if obj["add"] == "sphere":
+            return Sphere.from_yaml(obj)
+        elif obj["add"] == "plane":
+            return Plane.from_yaml(obj)
+        elif obj["add"] == "cube":
+            return Cube.from_yaml(obj)
+        elif obj["add"] == "cone":
+            return Cone.from_yaml(obj)
+        elif obj["add"] == "cylinder":
+            return Cylinder.from_yaml(obj)
+        elif obj["add"] == "group":
+            if "material" in obj:
+                for child in obj["children"]:
+                    if "material" not in child:
+                        child["material"] = deepcopy(obj["material"])
+            return Group.from_yaml(obj, defines)
+        elif obj["add"] == "csg":
+            print(obj)
+            if "material" in obj:
+                if "material" not in obj["left"]:
+                    obj["left"]["material"] = deepcopy(obj["material"])
+                if "material" not in obj["right"]:
+                    obj["right"]["material"] = deepcopy(obj["material"])
+            return CSG.from_yaml(obj, defines)
+        elif obj["add"] == "obj":
+            from obj_parser import OBJParser
+            return OBJParser.from_yaml(obj, defines)
+
+        return None
+
+    # TODO maybe this needs to be self == other
+    def includes(self, other):
+        return self is other
+
     def intersect(self, ray_original):
         ray = transform(ray_original, inverse(self.transform))
         return self.local_intersect(ray)
@@ -126,6 +165,92 @@ class Shape(object):
             self.material.refractive_index,
             self.transform)
 
+
+class CSG(Shape):
+    def __init__(self, material, transform, op, left, right):
+        Shape.__init__(self, material, transform)
+        self.op = op
+        self.left = left
+        self.right = right
+
+    @classmethod
+    def from_yaml(cls, tree, defines) -> 'CSG':
+        mat = Material()
+        xform = matrix4x4identity()
+        left = None
+        right = None
+        op = None
+
+        if 'material' in tree:
+            mat = Material.from_yaml(tree['material'])
+
+        if 'transform' in tree:
+            xform = Transform.from_yaml(tree['transform'])
+
+        left_obj = tree['left']
+        if 'add' in left_obj:
+            left = Shape._recursive_helper(left_obj, defines)
+        else:
+            raise ValueError('Malformed CSG yaml', tree)
+
+        right_obj = tree['right']
+        if 'add' in right_obj:
+            right = Shape._recursive_helper(right_obj, defines)
+        else:
+            raise ValueError('Malformed CSG yaml', tree)
+
+        op_obj = tree['op']
+        if op_obj == 'difference':
+            op = CSGDifference
+        elif op_obj == 'intersection':
+            op = CSGIntersect
+        elif op_obj == 'union':
+            op = CSGUnion
+        else:
+            raise ValueError('Malformed CSG yaml', tree)
+
+        return cls(material=mat, transform=xform, op=op, left=left, right=right)
+
+    def includes(self, other):
+        return self.left.includes(other) or self.right.includes(other)
+
+    def local_intersect(self, r):
+        leftxs = intersect(self.left, r)
+        rightxs = intersect(self.right, r)
+        xs = intersections(*(leftxs + rightxs))
+        return self.filter_intersections(xs)
+
+    # assume xs is already filtered
+    def filter_intersections(self, xs):
+        inl = False
+        inr = False
+        result = []
+        for i in xs:
+            lhit = self.left.includes(i.object)
+            if self.op.intersection_allowed(lhit, inl, inr):
+                result.append(i)
+            if lhit:
+                inl = not inl
+            else:
+                inr = not inr
+
+        return result
+
+class CSGUnion(object):
+    @classmethod
+    def intersection_allowed(cls, lhit, inl, inr):
+        return (lhit and not inr) or (not lhit and not inl)
+
+class CSGIntersect(object):
+    @classmethod
+    def intersection_allowed(cls, lhit, inl, inr):
+        return (lhit and inr) or (not lhit and inl)
+
+class CSGDifference(object):
+    @classmethod
+    def intersection_allowed(cls, lhit, inl, inr):
+        return (lhit and not inr) or (not lhit and inl)
+
 # TODO implement TriangleMesh aggregate shape
 
 class Group(Shape):
@@ -135,32 +260,6 @@ class Group(Shape):
         for child in self.children:
             child.parent = self
 
-    @classmethod
-    def _recursive_helper(cls, obj, defines) -> 'Shape':
-        if 'transform' not in obj:
-            obj['transform'] = []
-
-        if obj["add"] == "sphere":
-            return Sphere.from_yaml(obj)
-        elif obj["add"] == "plane":
-            return Plane.from_yaml(obj)
-        elif obj["add"] == "cube":
-            return Cube.from_yaml(obj)
-        elif obj["add"] == "cone":
-            return Cone.from_yaml(obj)
-        elif obj["add"] == "cylinder":
-            return Cylinder.from_yaml(obj)
-        elif obj["add"] == "group":
-            if "material" in obj:
-                for child in obj["children"]:
-                    if "material" not in child:
-                        child["material"] = deepcopy(obj["material"])
-            return Group.from_yaml(obj, defines)
-        elif obj["add"] == "obj":
-            from obj_parser import OBJParser
-            return OBJParser.from_yaml(obj, defines)
-
-        return None
 
     @classmethod
     def from_yaml(cls, tree, defines) -> 'Group':
@@ -176,9 +275,12 @@ class Group(Shape):
 
         for obj in tree['children']:
             if "add" in obj:
-                children.add(Group._recursive_helper(obj, defines))
+                children.add(Shape._recursive_helper(obj, defines))
 
         return cls(material=mat, transform=xform, children=children)
+
+    def includes(self, other):
+        return any([c.includes(other) for c in self.children])
 
     def local_intersect(self, ray_local):
         xs = []
@@ -851,7 +953,7 @@ def cube():
     >>> all(ts)
     True
     """
-    return Cube()
+    return Cube(Material(), matrix4x4identity())
 
 def plane():
     """
@@ -1141,7 +1243,62 @@ def material():
     return Material(color(1,1,1),0.1,0.9,0.9,200.0)
 
 if __name__ == '__main__':
-    t = Triangle(Material(), matrix4x4identity(), point(0,1,0), point(-1,0,0), point(1,0,0))
-    r = ray(point(0,0.5,-2), vector(0,0,1))
-    print(len(t.local_intersect(r)))
+    tups = [(CSGUnion, True, True, True, False),
+            (CSGUnion, True, True, False, True),
+            (CSGUnion, True, False, True, False),
+            (CSGUnion, True, False, False, True),
+            (CSGUnion, False, True, True, False),
+            (CSGUnion, False, True, False, False),
+            (CSGUnion, False, False, True, True),
+            (CSGUnion, False, False, False, True),
+            (CSGIntersect, True, True, True, True),
+            (CSGIntersect, True, True, False, False),
+            (CSGIntersect, True, False, True, True),
+            (CSGIntersect, True, False, False, False),
+            (CSGIntersect, False, True, True, True),
+            (CSGIntersect, False, True, False, True),
+            (CSGIntersect, False, False, True, False),
+            (CSGIntersect, False, False, False, False),
+            (CSGDifference, True, True, True, False),
+            (CSGDifference, True, True, False, True),
+            (CSGDifference, True, False, True, False),
+            (CSGDifference, True, False, False, True),
+            (CSGDifference, False, True, True, True),
+            (CSGDifference, False, True, False, True),
+            (CSGDifference, False, False, True, False),
+            (CSGDifference, False, False, False, False)]
+    for tup in tups:
+        result = tup[0].intersection_allowed(tup[1], tup[2], tup[3])
+        #print(result == tup[4])
+
+    tups = [
+        (CSGUnion, 0, 3),
+        (CSGIntersect, 1, 2),
+        (CSGDifference, 0, 1)
+    ]
+    s1 = sphere()
+    s2 = cube()
+    for tup in tups:
+        c = CSG(Material(), matrix4x4identity(), tup[0], s1, s2)
+        xs = intersections(intersection(1, s1),
+                           intersection(2, s2),
+                           intersection(3, s1),
+                           intersection(4, s2))
+        result = c.filter_intersections(xs)
+        #print(len(result) == 2 and result[0] == xs[tup[1]] and result[1] == xs[tup[2]])
+
+    c = CSG(Material(), matrix4x4identity(), CSGUnion, s1, s2)
+    r = ray(point(0,2,-5), vector(0,0,1))
+    xs = c.local_intersect(r)
+
+    s2.transform = Transform.translate(0,0,0.5)
+    c = CSG(Material(), matrix4x4identity(), CSGUnion, s1, s2)
+    r = ray(point(0,0,-5), vector(0,0,1))
+    xs = c.local_intersect(r)
+    print(len(xs) == 2)
+    print(xs[0].t == 4)
+    print(xs[0].object == s1)
+    print(xs[1].t == 6.5)
+    print(xs[1].object == s2)
+
 

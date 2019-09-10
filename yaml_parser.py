@@ -1,5 +1,5 @@
 from renderer import Camera, PointLight
-from shapes import Sphere, Plane, Cube, Cone, Cylinder, Group
+from shapes import Shape
 
 from copy import deepcopy
 import yaml
@@ -57,7 +57,7 @@ def yaml_file_to_world_objects(file_path):
     return rv
 
 def recursive_add(tree, defines):
-    return Group._recursive_helper(tree, defines)
+    return Shape._recursive_helper(tree, defines)
 
 # replace occurrences of previous defines in the tree
 def expand_defines_in_tree(tree, defines):
@@ -100,9 +100,17 @@ def expand_defines_in_tree(tree, defines):
                 else:
                     obj["value"] = deepcopy(defines[k])
             if "add" in obj and k == obj["add"]:
+                print(obj)
+                print(defines[k])
                 new_defines = deepcopy(defines[k])
                 if "add" in new_defines and new_defines["add"] == "group" and "children" in new_defines:
                     expand_defines_in_tree(new_defines["children"], defines)
+
+                if "add" in new_defines and new_defines["add"] == "csg" and "left" in new_defines:
+                    expand_defines_in_tree([new_defines["left"]], defines)
+                if "add" in new_defines and new_defines["add"] == "csg" and "right" in new_defines:
+                    expand_defines_in_tree([new_defines["right"]], defines)
+
                 for l in new_defines:
                     if l != "material" and l != "transform":
                         obj[l] = new_defines[l]
