@@ -51,6 +51,7 @@ class BoundingBox(object):
     def contains_box(self, other):
         return self is other or (self.contains_point(other.min) and self.contains_point(other.max))
 
+    @lru_cache(maxsize=CACHE_SIZE)
     def transform(self, matrix):
         p1 = self.min
         p2 = point(self.min[0], self.min[1], self.max[2])
@@ -198,7 +199,7 @@ class Material(object):
                         casts_shadow=casts_shadow)
 
     def __repr__(self):
-        return "c: {} a: {} d: {} sp: {} sh: {} refl: {} trans: {} refr: {}".format(
+        return "Material c: {} a: {} d: {} sp: {} sh: {} refl: {} trans: {} refr: {} shadow:".format(
             self.color,
             self.ambient,
             self.diffuse,
@@ -206,7 +207,8 @@ class Material(object):
             self.shininess,
             self.reflective,
             self.transparency,
-            self.refractive_index)
+            self.refractive_index,
+            self.casts_shadow)
 
 class Ray(object):
     def __init__(self, o, d):
@@ -295,16 +297,9 @@ class Shape(object):
         return
 
     def __repr__(self):
-        return "Shape: (Material: {} {} {} {} {} {} {} {} {}), Transform: {}".format(
-            self.material.color,
-            self.material.ambient,
-            self.material.diffuse,
-            self.material.specular,
-            self.material.shininess,
-            self.material.pattern,
-            self.material.reflective,
-            self.material.transparency,
-            self.material.refractive_index,
+        return "{}: ({}) {}".format(
+            type(self).__name__,
+            self.material.__repr__(),
             self.transform)
 
 
@@ -386,13 +381,20 @@ class CSG(Shape):
     def bounds(self):
         box = BoundingBox()
         for c in [self.left, self.right]:
-            cbox = c.bounds()
+            cbox = c.parent_space_bounds()
             box.add_box(cbox)
         return box
 
     def divide(self, threshold):
         self.left.divide(threshold)
         self.right.divide(threshold)
+
+    def __repr__(self):
+        return "CSG: ({}) Left:\n{}\nRight:\n{} ".format(
+            type(self).__name__,
+            self.material.__repr__(),
+            self.left.__repr__(),
+            self.right.__repr__())
 
 class CSGUnion(object):
     @classmethod
@@ -408,9 +410,6 @@ class CSGDifference(object):
     @classmethod
     def intersection_allowed(cls, lhit, inl, inr):
         return (lhit and not inr) or (not lhit and inl)
-
-# TODO implement TriangleMesh aggregate shape
-# TODO maybe BVH will do the trick...
 
 class Group(Shape):
     def __init__(self, material, transform, children):
@@ -441,7 +440,9 @@ class Group(Shape):
         return any([c.includes(other) for c in self.children])
 
     def local_intersect(self, ray_local):
-        if len(self.bounds().intersect(ray_local)) > 0:
+        bbox = self.bounds()
+
+        if len(bbox.intersect(ray_local)) > 0:
             xs = []
             for shape in self.children:
                 xs.extend(shape.intersect(ray_local))
@@ -463,7 +464,7 @@ class Group(Shape):
     def bounds(self):
         box = BoundingBox()
         for c in self.children:
-            cbox = c.bounds()
+            cbox = c.parent_space_bounds()
             box.add_box(cbox)
         return box
 
@@ -498,18 +499,11 @@ class Group(Shape):
         return left_group, right_group
 
     def __repr__(self):
-        return "Group: (Children: {}) (Material: {} {} {} {} {} {} {} {} {}), Transform: {}".format(
-            self.children,
-            self.material.color,
-            self.material.ambient,
-            self.material.diffuse,
-            self.material.specular,
-            self.material.shininess,
-            self.material.pattern,
-            self.material.reflective,
-            self.material.transparency,
-            self.material.refractive_index,
-            self.transform)
+        c_strings = []
+        for c in self.children:
+            c_strings.append(c.__repr__())
+        grouping_string = '{}\n' * len(c_strings)
+        return 'Group: ({}) {} Children:\n{}'.format(self.material.__repr__(), self.transform, grouping_string.format(*c_strings))
 
 class Sphere(Shape):
     def __init__(self, material, transform):

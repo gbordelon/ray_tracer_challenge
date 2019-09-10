@@ -343,8 +343,8 @@ def csg_test(yaml_file_path, output_file_path):
 
 
 if __name__ == '__main__':
-    input_yaml_file_path = './obj_file_test.yml'
-    output_file_path = './obj_test.ppm'
+    input_yaml_file_path = './bounding_boxes.yml'
+    output_file_path = './bounding_boxes.ppm'
     csg_test(input_yaml_file_path, output_file_path)
     #import cProfile
     #cProfile.run('csg_test(input_yaml_file_path, output_file_path)', sort='tottime')

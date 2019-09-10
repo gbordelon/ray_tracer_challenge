@@ -57,7 +57,6 @@ def yaml_file_to_world_objects(file_path):
 
     g = Group(material=Material(), transform=matrix4x4identity(), children=rv['world'])
     rv['world'] = [g]
-
     return rv
 
 def recursive_add(tree, defines):
@@ -103,19 +102,35 @@ def expand_defines_in_tree(tree, defines):
                             obj["value"].insert(0, item)
                 else:
                     obj["value"] = deepcopy(defines[k])
-            if "add" in obj and k == obj["add"]:
-                new_defines = deepcopy(defines[k])
-                if "add" in new_defines and new_defines["add"] == "group" and "children" in new_defines:
-                    expand_defines_in_tree(new_defines["children"], defines)
+            if "add" in obj:
+                if k == obj["add"]:
+                    new_defines = deepcopy(defines[k])
+                    if "add" in new_defines and new_defines["add"] == "group" and "children" in new_defines:
+                        expand_defines_in_tree(new_defines["children"], defines)
 
-                if "add" in new_defines and new_defines["add"] == "csg" and "left" in new_defines:
-                    expand_defines_in_tree([new_defines["left"]], defines)
-                if "add" in new_defines and new_defines["add"] == "csg" and "right" in new_defines:
-                    expand_defines_in_tree([new_defines["right"]], defines)
+                    if "add" in new_defines and new_defines["add"] == "csg" and "left" in new_defines:
+                        expand_defines_in_tree([new_defines["left"]], defines)
+                    if "add" in new_defines and new_defines["add"] == "csg" and "right" in new_defines:
+                        expand_defines_in_tree([new_defines["right"]], defines)
 
-                for l in new_defines:
-                    if l != "material" and l != "transform":
-                        obj[l] = new_defines[l]
+                    for l in new_defines:
+                        if l != "material" and l != "transform":
+                            obj[l] = new_defines[l]
+                        if l == "material" and "material" not in obj:
+                            obj[l] = new_defines[l]
+                        if l == "transform":
+                            if "transform" not in obj:
+                                obj[l] = new_defines[l]
+                            else:
+                                i = 0
+                                for xform in new_defines[l]:
+                                    obj[l].insert(i, xform)
+                                    i += 1
+                if obj["add"] == "group" and "children" in obj:
+                    expand_defines_in_tree(obj["children"], defines)
+                #if obj["add"] == "csg" and "left" in obj and "right" in obj:
+                #    expand_defines_in_tree(obj["left"], defines)
+                #    expand_defines_in_tree(obj["right"], defines)
 
 if __name__ == '__main__':
     x = yaml_file_to_world_objects("group.yml")
