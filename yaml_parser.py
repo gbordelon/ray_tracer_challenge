@@ -1,5 +1,6 @@
 from renderer import Camera, PointLight
-from shapes import Shape
+from shapes import Shape, Group, Material
+from matrix import matrix4x4identity
 
 from copy import deepcopy
 import yaml
@@ -53,6 +54,9 @@ def yaml_file_to_world_objects(file_path):
                 possible_item = recursive_add(obj, defines)
                 if possible_item is not None:
                     rv['world'].append(possible_item)
+
+    g = Group(material=Material(), transform=matrix4x4identity(), children=rv['world'])
+    rv['world'] = [g]
 
     return rv
 

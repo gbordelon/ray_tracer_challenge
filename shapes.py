@@ -5,6 +5,133 @@ from renderer import *
 from vector import *
 
 from copy import deepcopy
+from functools import lru_cache
+
+class BoundingBox(object):
+    def __init__(self, min=point(np.inf, np.inf, np.inf), max=point(-np.inf, -np.inf, -np.inf)):
+        self.min = min
+        self.max = max
+
+    def add_point(self, pt):
+        min_x = self.min[0]
+        min_y = self.min[1]
+        min_z = self.min[2]
+        max_x = self.max[0]
+        max_y = self.max[1]
+        max_z = self.max[2]
+
+        if pt[0] < self.min[0]:
+            min_x = pt[0]
+        if pt[1] < self.min[1]:
+            min_y = pt[1]
+        if pt[2] < self.min[2]:
+            min_z = pt[2]
+
+        if pt[0] > self.max[0]:
+            max_x = pt[0]
+        if pt[1] > self.max[1]:
+            max_y = pt[1]
+        if pt[2] > self.max[2]:
+            max_z = pt[2]
+
+        self.min = point(min_x, min_y, min_z)
+        self.max = point(max_x, max_y, max_z)
+
+    def add_box(self, other):
+        if self is other:
+            return
+        self.add_point(other.min)
+        self.add_point(other.max)
+
+    def contains_point(self, pt):
+        return self.min[0] <= pt[0] <= self.max[0]\
+               and self.min[1] <= pt[1] <= self.max[1]\
+               and self.min[2] <= pt[2] <= self.max[2]
+
+    def contains_box(self, other):
+        return self is other or (self.contains_point(other.min) and self.contains_point(other.max))
+
+    def transform(self, matrix):
+        p1 = self.min
+        p2 = point(self.min[0], self.min[1], self.max[2])
+        p3 = point(self.min[0], self.max[1], self.min[2])
+        p4 = point(self.min[0], self.max[1], self.max[2])
+        p5 = point(self.max[0], self.min[1], self.min[2])
+        p6 = point(self.max[0], self.min[1], self.max[2])
+        p7 = point(self.max[0], self.max[1], self.min[2])
+        p8 = self.max
+
+        new_bbox = BoundingBox()
+
+        for p in [p1, p2, p3, p4, p5, p6, p7, p8]:
+            new_bbox.add_point(matrix * p)
+
+        return new_bbox
+
+    def intersect(self, ray):
+        return self.local_intersect(ray)
+
+    def local_intersect(self, ray_local):
+        xtmin, xtmax = self._check_axis(ray_local.origin[0], ray_local.direction[0], self.min[0], self.max[0])
+        ytmin, ytmax = self._check_axis(ray_local.origin[1], ray_local.direction[1], self.min[1], self.max[1])
+        ztmin, ztmax = self._check_axis(ray_local.origin[2], ray_local.direction[2], self.min[2], self.max[2])
+
+        tmin = max(xtmin, ytmin, ztmin)
+        tmax = min(xtmax, ytmax, ztmax)
+
+        if tmin > tmax:
+            return []
+        return intersections(intersection(tmin, self), intersection(tmax, self))
+
+    def _check_axis(self, origin, direction, min, max):
+        tmin_numerator = min - origin
+        tmax_numerator = max - origin
+
+        if abs(direction) >= EPSILON:
+            tmin = tmin_numerator / direction
+            tmax = tmax_numerator / direction
+        else:
+            tmin = tmin_numerator * np.inf
+            if tmin == np.nan:
+                tmin = np.inf
+                if tmin_numerator < 0:
+                    tmin = -np.inf
+            tmax = tmax_numerator * np.inf
+            if tmax == np.nan:
+                tmax = np.inf
+                if tmax_numerator < 0:
+                    tmax = -np.inf
+
+        if tmin > tmax:
+            return tmax, tmin
+        return tmin, tmax
+
+    def split_bounds(self):
+        dx = abs(self.max[0] - self.min[0])
+        dy = abs(self.max[1] - self.min[1])
+        dz = abs(self.max[2] - self.min[2])
+        greatest = max(dx,dy,dz)
+
+        x0, y0, z0 = self.min[0], self.min[1], self.min[2]
+        x1, y1, z1 = self.max[0], self.max[1], self.max[2]
+
+        if greatest == dx:
+            x0 = x1 = x0 + dx / 2.0
+        elif greatest == dy:
+            y0 = y1 = y0 + dy / 2.0
+        else:
+            z0 = z1 = z0 + dz / 2.0
+
+        mid_min = point(x0, y0, z0)
+        mid_max = point(x1, y1, z1)
+
+        return BoundingBox(min=self.min,max=mid_max), BoundingBox(min=mid_min,max=self.max)
+
+    def cube(self):
+        pass
+
+    def __repr__(self):
+        return 'BoundingBox: {} {}'.format(self.min, self.max)
 
 class Material(object):
     def __init__(self, color=color(1,1,1), ambient=0.1, diffuse=0.9, specular=0.9, shininess=200.0, reflective=0.0, transparency=0.0, refractive_index=1.0, casts_shadow=True):
@@ -126,7 +253,6 @@ class Shape(object):
 
         return None
 
-    # TODO maybe this needs to be self == other
     def includes(self, other):
         return self is other
 
@@ -156,6 +282,17 @@ class Shape(object):
             normal = self.parent.normal_to_world(normal)
 
         return normal
+
+    @lru_cache(maxsize=CACHE_SIZE)
+    def bounds(self):
+        return BoundingBox(point(-1,-1,-1), point(1,1,1))
+
+    @lru_cache(maxsize=CACHE_SIZE)
+    def parent_space_bounds(self):
+        return self.bounds().transform(self.transform)
+
+    def divide(self, threshold):
+        return
 
     def __repr__(self):
         return "Shape: (Material: {} {} {} {} {} {} {} {} {}), Transform: {}".format(
@@ -222,10 +359,12 @@ class CSG(Shape):
         return self.left.includes(other) or self.right.includes(other)
 
     def local_intersect(self, r):
-        leftxs = intersect(self.left, r)
-        rightxs = intersect(self.right, r)
-        xs = intersections(*(leftxs + rightxs))
-        return self.filter_intersections(xs)
+        if len(self.bounds().intersect(r)) > 0:
+            leftxs = intersect(self.left, r)
+            rightxs = intersect(self.right, r)
+            xs = intersections(*(leftxs + rightxs))
+            return self.filter_intersections(xs)
+        return []
 
     # assume xs is already filtered
     def filter_intersections(self, xs):
@@ -243,6 +382,18 @@ class CSG(Shape):
 
         return result
 
+    @lru_cache(maxsize=CACHE_SIZE)
+    def bounds(self):
+        box = BoundingBox()
+        for c in [self.left, self.right]:
+            cbox = c.bounds()
+            box.add_box(cbox)
+        return box
+
+    def divide(self, threshold):
+        self.left.divide(threshold)
+        self.right.divide(threshold)
+
 class CSGUnion(object):
     @classmethod
     def intersection_allowed(cls, lhit, inl, inr):
@@ -259,14 +410,14 @@ class CSGDifference(object):
         return (lhit and not inr) or (not lhit and inl)
 
 # TODO implement TriangleMesh aggregate shape
+# TODO maybe BVH will do the trick...
 
 class Group(Shape):
     def __init__(self, material, transform, children):
         Shape.__init__(self, material, transform)
-        self.children = children
+        self.children = set(children)
         for child in self.children:
             child.parent = self
-
 
     @classmethod
     def from_yaml(cls, tree, defines) -> 'Group':
@@ -290,10 +441,12 @@ class Group(Shape):
         return any([c.includes(other) for c in self.children])
 
     def local_intersect(self, ray_local):
-        xs = []
-        for shape in self.children:
-            xs.extend(shape.intersect(ray_local))
-        return intersections(*xs)
+        if len(self.bounds().intersect(ray_local)) > 0:
+            xs = []
+            for shape in self.children:
+                xs.extend(shape.intersect(ray_local))
+            return intersections(*xs)
+        return []
 
     def add_child(self, shapes):
         if self is shapes:
@@ -305,6 +458,44 @@ class Group(Shape):
         else:
             self.children.add(shapes)
             shapes.parent = self
+
+    @lru_cache(maxsize=CACHE_SIZE)
+    def bounds(self):
+        box = BoundingBox()
+        for c in self.children:
+            cbox = c.bounds()
+            box.add_box(cbox)
+        return box
+
+    def divide(self, threshold):
+        if threshold <= len(self.children):
+            left, right = self._partition_children()
+            if len(left) > 0:
+                self._make_subgroup(left)
+            if len(right) > 0:
+                self._make_subgroup(right)
+
+        for c in self.children:
+            c.divide(threshold)
+
+    def _make_subgroup(self, children):
+        sub_group = Group(self.material, self.transform, children)
+        for c in children:
+            self.children.remove(c)
+        self.add_child(sub_group)
+
+    def _partition_children(self):
+        left_box, right_box = self.bounds().split_bounds()
+        left_group = []
+        right_group = []
+
+        for c in self.children:
+            sub_box = c.bounds()
+            if left_box.contains_box(sub_box):
+                left_group.append(c)
+            elif right_box.contains_box(sub_box):
+                right_group.append(c)
+        return left_group, right_group
 
     def __repr__(self):
         return "Group: (Children: {}) (Material: {} {} {} {} {} {} {} {} {}), Transform: {}".format(
@@ -364,6 +555,9 @@ class Plane(Shape):
     def local_normal_at(self, local_point, hit=None):
         return self.normalv
 
+    @lru_cache(maxsize=CACHE_SIZE)
+    def bounds(self):
+        return BoundingBox(point(-np.inf,0,-np.inf), point(np.inf,0,np.inf))
 
 class Cube(Shape):
     def __init__(self, material, transform):
@@ -508,6 +702,14 @@ class Cone(Shape):
         if self._check_cap(ray_local, t, self.maximum):
             xs.append(intersection(t, self))
 
+    @lru_cache(maxsize=CACHE_SIZE)
+    def bounds(self):
+        a = abs(self.minimum)
+        b = abs(self.maximum)
+        limit = max(a,b)
+
+        return BoundingBox(point(-limit, self.minimum, -limit), point(limit, self.maximum, limit))
+
 
 class Cylinder(Shape):
     def __init__(self, material, transform, minimum=-np.inf, maximum=np.inf, closed=False):
@@ -585,6 +787,10 @@ class Cylinder(Shape):
         if self._check_cap(ray_local, t):
             xs.append(intersection(t, self))
 
+    @lru_cache(maxsize=CACHE_SIZE)
+    def bounds(self):
+        return BoundingBox(point(-1,self.minimum,-1), point(1,self.maximum,1))
+
 
 class Triangle(Shape):
     def __init__(self, material, transform, p1, p2, p3):
@@ -618,6 +824,15 @@ class Triangle(Shape):
 
         t = f * dot(self.e2, origin_cross_e1)
         return intersections(intersection(t, self))
+
+    @lru_cache(maxsize=CACHE_SIZE)
+    def bounds(self):
+        b = BoundingBox()
+        b.add_point(self.p1)
+        b.add_point(self.p2)
+        b.add_point(self.p3)
+
+        return b
 
     def __repr__(self):
         return '{} {} {} {} {} {}'.format(self.p1, self.p2, self.p3, self.e1, self.e2, self.normal)
@@ -657,6 +872,15 @@ class SmoothTriangle(Shape):
 
         t = f * dot(self.e2, origin_cross_e1)
         return intersections(intersection_with_uv(t, self, u, v))
+
+    @lru_cache(maxsize=CACHE_SIZE)
+    def bounds(self):
+        b = BoundingBox()
+        b.add_point(self.p1)
+        b.add_point(self.p2)
+        b.add_point(self.p3)
+
+        return b
 
 
 class Intersection(object):
@@ -1256,62 +1480,4 @@ def material():
     return Material(color(1,1,1),0.1,0.9,0.9,200.0)
 
 if __name__ == '__main__':
-    tups = [(CSGUnion, True, True, True, False),
-            (CSGUnion, True, True, False, True),
-            (CSGUnion, True, False, True, False),
-            (CSGUnion, True, False, False, True),
-            (CSGUnion, False, True, True, False),
-            (CSGUnion, False, True, False, False),
-            (CSGUnion, False, False, True, True),
-            (CSGUnion, False, False, False, True),
-            (CSGIntersect, True, True, True, True),
-            (CSGIntersect, True, True, False, False),
-            (CSGIntersect, True, False, True, True),
-            (CSGIntersect, True, False, False, False),
-            (CSGIntersect, False, True, True, True),
-            (CSGIntersect, False, True, False, True),
-            (CSGIntersect, False, False, True, False),
-            (CSGIntersect, False, False, False, False),
-            (CSGDifference, True, True, True, False),
-            (CSGDifference, True, True, False, True),
-            (CSGDifference, True, False, True, False),
-            (CSGDifference, True, False, False, True),
-            (CSGDifference, False, True, True, True),
-            (CSGDifference, False, True, False, True),
-            (CSGDifference, False, False, True, False),
-            (CSGDifference, False, False, False, False)]
-    for tup in tups:
-        result = tup[0].intersection_allowed(tup[1], tup[2], tup[3])
-        #print(result == tup[4])
-
-    tups = [
-        (CSGUnion, 0, 3),
-        (CSGIntersect, 1, 2),
-        (CSGDifference, 0, 1)
-    ]
-    s1 = sphere()
-    s2 = cube()
-    for tup in tups:
-        c = CSG(Material(), matrix4x4identity(), tup[0], s1, s2)
-        xs = intersections(intersection(1, s1),
-                           intersection(2, s2),
-                           intersection(3, s1),
-                           intersection(4, s2))
-        result = c.filter_intersections(xs)
-        #print(len(result) == 2 and result[0] == xs[tup[1]] and result[1] == xs[tup[2]])
-
-    c = CSG(Material(), matrix4x4identity(), CSGUnion, s1, s2)
-    r = ray(point(0,2,-5), vector(0,0,1))
-    xs = c.local_intersect(r)
-
-    s2.transform = Transform.translate(0,0,0.5)
-    c = CSG(Material(), matrix4x4identity(), CSGUnion, s1, s2)
-    r = ray(point(0,0,-5), vector(0,0,1))
-    xs = c.local_intersect(r)
-    print(len(xs) == 2)
-    print(xs[0].t == 4)
-    print(xs[0].object == s1)
-    print(xs[1].t == 6.5)
-    print(xs[1].object == s2)
-
-
+    pass

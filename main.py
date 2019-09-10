@@ -301,56 +301,32 @@ def yaml_test(yaml_file_name, output_file_name):
     with open(output_file_name + 'ppm', 'wb') as f:
         f.write(ppm)
 
-def obj_test(yaml_file_path, output_file_path):
-    from yaml_parser import yaml_file_to_world_objects
-
-    w = default_world()
-    w.contains = []
-    mat = Material()
-    mat.color = color(1,0,0)
-
-    yaml_objs = yaml_file_to_world_objects(yaml_file_path)
-
-    cam = yaml_objs['camera']
-    w.lights = yaml_objs['lights']
-
-    w.contains.extend(yaml_objs['world'])
-
-    now = datetime.now(timezone.utc)
-    epoch = datetime(1970, 1, 1, tzinfo=timezone.utc) # use POSIX epoch
-    posix_timestamp_micros_before = (now - epoch) / timedelta(microseconds=1)
-
-    print('canvas construction start at {}'.format(now))
-    ca = render_multi(cam, w, 4)
-
-    now = datetime.now(timezone.utc)
-    epoch = datetime(1970, 1, 1, tzinfo=timezone.utc) # use POSIX epoch
-    posix_timestamp_micros_after = (now - epoch) / timedelta(microseconds=1)
-    delta = posix_timestamp_micros_after - posix_timestamp_micros_before
-    print('canvas constructed in {} seconds.'.format(delta/1000000))
-
-    ppm = construct_ppm(ca)
-    with open(output_file_path, 'wb') as f:
-        f.write(ppm)
-
 def csg_test(yaml_file_path, output_file_path):
     from yaml_parser import yaml_file_to_world_objects
 
     w = default_world()
     w.contains = []
-    mat = Material()
-    mat.color = color(1,0,0)
 
     yaml_objs = yaml_file_to_world_objects(yaml_file_path)
 
     cam = yaml_objs['camera']
     w.lights = yaml_objs['lights']
 
-    w.contains.extend(yaml_objs['world'])
+    gs = yaml_objs['world']
 
     now = datetime.now(timezone.utc)
     epoch = datetime(1970, 1, 1, tzinfo=timezone.utc) # use POSIX epoch
     posix_timestamp_micros_before = (now - epoch) / timedelta(microseconds=1)
+
+    print('Bounding volume construction start at {}'.format(now))
+    gs[0].divide(1)
+    w.contains.extend(yaml_objs['world'])
+
+    now = datetime.now(timezone.utc)
+    epoch = datetime(1970, 1, 1, tzinfo=timezone.utc) # use POSIX epoch
+    posix_timestamp_micros_middle = (now - epoch) / timedelta(microseconds=1)
+    delta = posix_timestamp_micros_middle - posix_timestamp_micros_before
+    print('Bounding volume constructed in {} seconds'.format(delta/1000000))
 
     print('canvas construction start at {}'.format(now))
     ca = render_multi(cam, w, 4)
@@ -358,7 +334,7 @@ def csg_test(yaml_file_path, output_file_path):
     now = datetime.now(timezone.utc)
     epoch = datetime(1970, 1, 1, tzinfo=timezone.utc) # use POSIX epoch
     posix_timestamp_micros_after = (now - epoch) / timedelta(microseconds=1)
-    delta = posix_timestamp_micros_after - posix_timestamp_micros_before
+    delta = posix_timestamp_micros_after - posix_timestamp_micros_middle
     print('canvas constructed in {} seconds.'.format(delta/1000000))
 
     ppm = construct_ppm(ca)
@@ -366,26 +342,13 @@ def csg_test(yaml_file_path, output_file_path):
         f.write(ppm)
 
 
-
 if __name__ == '__main__':
-    input_yaml_file_path = './csg_test.yml'
-    output_file_path = './csg_test.ppm'
-    obj_test(input_yaml_file_path, output_file_path)
+    input_yaml_file_path = './obj_file_test.yml'
+    output_file_path = './obj_test.ppm'
+    csg_test(input_yaml_file_path, output_file_path)
+    #import cProfile
+    #cProfile.run('csg_test(input_yaml_file_path, output_file_path)', sort='tottime')
 
     im = Image.open(output_file_path, 'r')
     im.save(output_file_path[:-3] + 'jpg')
     im.close()
-
-    """
-    input_file_name = './group.yml'
-    output_file_name = './yaml_test.'
-    ppm_ext = 'ppm'
-    jpg_ext = 'jpg'
-
-    yaml_test(input_file_name, output_file_name)
-
-    im = Image.open(output_file_name + ppm_ext, 'r')
-    im.save(output_file_name + jpg_ext)
-    im.close()
-    """
-

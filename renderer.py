@@ -774,11 +774,14 @@ def render(cam, world):
 def render_multi_helper(args):
     cam, world, window_x, window_y = args
 
+    buffer = np.zeros((BLOCK_SIZE, BLOCK_SIZE, 3))
     for idx_x in range(window_x, window_x + BLOCK_SIZE):
         for idx_y in range(window_y, window_y + BLOCK_SIZE):
             r = ray_for_pixel(cam, idx_x, idx_y)
             c = color_at(world, r)
-            write_pixel(image, idx_x, idx_y, c)
+            buffer[idx_x-window_x, idx_y-window_y] = c
+
+    write_pixels(image, buffer, window_x, window_y, BLOCK_SIZE)
 
 def render_multi(cam, world, num_threads=4):
     """
@@ -802,6 +805,7 @@ def render_multi(cam, world, num_threads=4):
         _ = p.map(render_multi_helper, window_idxs)
 
     return np.ctypeslib.as_array(image.shared_arr)
+    #return image.np_arr
 
 def normal_at(shape, world_point, hit):
     """

@@ -32,6 +32,7 @@ def color(r, g, b):
     """
     return np.array([r,g,b], dtype=np.float64)
 
+
 class Canvas(object):
     def __init__(self, width, height):
         self.shape = (width, height)
@@ -43,6 +44,19 @@ class Canvas(object):
 
     def __setitem__(self, index, value):
         np.ctypeslib.as_array(self.shared_arr)[index] = value
+
+"""
+class Canvas(object):
+    def __init__(self, width, height):
+        self.shape = (width, height)
+        self.np_arr = np.zeros((width, height, 3))
+
+    def __getitem__(self, index):
+        return self.np_arr[index]
+
+    def __setitem__(self, index, value):
+        self.np_arr[index] = value
+"""
 
 def canvas(w, h):
     """
@@ -58,6 +72,9 @@ def canvas(w, h):
 
 def pixel_at(canvas, x, y):
     return canvas[x, y]
+
+def write_pixels(canvas, block, x_start, y_start, shape):
+    canvas[x_start:x_start+shape, y_start:y_start+shape] = block
 
 def write_pixel(canvas, x, y, color):
     """
