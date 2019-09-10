@@ -100,8 +100,6 @@ def expand_defines_in_tree(tree, defines):
                 else:
                     obj["value"] = deepcopy(defines[k])
             if "add" in obj and k == obj["add"]:
-                print(obj)
-                print(defines[k])
                 new_defines = deepcopy(defines[k])
                 if "add" in new_defines and new_defines["add"] == "group" and "children" in new_defines:
                     expand_defines_in_tree(new_defines["children"], defines)

@@ -7,7 +7,7 @@ from vector import *
 from copy import deepcopy
 
 class Material(object):
-    def __init__(self, color=color(1,1,1), ambient=0.1, diffuse=0.9, specular=0.9, shininess=200.0, reflective=0.0, transparency=0.0, refractive_index=1.0):
+    def __init__(self, color=color(1,1,1), ambient=0.1, diffuse=0.9, specular=0.9, shininess=200.0, reflective=0.0, transparency=0.0, refractive_index=1.0, casts_shadow=True):
         if ambient < 0 or diffuse < 0 or specular < 0 or shininess < 0:
             raise ValueError("Materials expect non-negative floating point values.")
         self.color = color
@@ -19,6 +19,7 @@ class Material(object):
         self.reflective = reflective
         self.transparency = transparency
         self.refractive_index = refractive_index
+        self.casts_shadow = casts_shadow
 
     @classmethod
     def from_yaml(cls, obj) -> 'Material':
@@ -30,6 +31,7 @@ class Material(object):
         reflective = 0.0
         transparency = 0.0
         refractive_index = 1.0
+        casts_shadow = True
 
         if 'color' in obj:
             c = color(*obj['color'])
@@ -55,6 +57,9 @@ class Material(object):
         if 'refractive-index' in obj:
             refractive_index = float(obj['refractive-index'])
 
+        if 'casts-shadow' in obj:
+            casts_shadow = obj['casts-shadow']
+
         return Material(color=c,
                         diffuse=diffuse,
                         ambient=ambient,
@@ -62,7 +67,8 @@ class Material(object):
                         shininess=shininess,
                         reflective=reflective,
                         transparency=transparency,
-                        refractive_index=refractive_index)
+                        refractive_index=refractive_index,
+                        casts_shadow=casts_shadow)
 
     def __repr__(self):
         return "c: {} a: {} d: {} sp: {} sh: {} refl: {} trans: {} refr: {}".format(
@@ -108,7 +114,6 @@ class Shape(object):
                         child["material"] = deepcopy(obj["material"])
             return Group.from_yaml(obj, defines)
         elif obj["add"] == "csg":
-            print(obj)
             if "material" in obj:
                 if "material" not in obj["left"]:
                     obj["left"]["material"] = deepcopy(obj["material"])
@@ -172,6 +177,8 @@ class CSG(Shape):
         self.op = op
         self.left = left
         self.right = right
+        self.left.parent = self
+        self.right.parent = self
 
     @classmethod
     def from_yaml(cls, tree, defines) -> 'CSG':
@@ -295,11 +302,9 @@ class Group(Shape):
             self.children.update(shapes)
             for sh in shapes:
                 sh.parent = self
-                #sh.material = self.material
         else:
             self.children.add(shapes)
             shapes.parent = self
-            #shapes.material = self.material
 
     def __repr__(self):
         return "Group: (Children: {}) (Material: {} {} {} {} {} {} {} {} {}), Transform: {}".format(
@@ -402,7 +407,15 @@ class Cube(Shape):
             tmax = tmax_numerator / direction
         else:
             tmin = tmin_numerator * np.inf
+            if tmin == np.nan:
+                tmin = np.inf
+                if tmin_numerator < 0:
+                    tmin = -np.inf
             tmax = tmax_numerator * np.inf
+            if tmax == np.nan:
+                tmax = np.inf
+                if tmax_numerator < 0:
+                    tmax = -np.inf
 
         if tmin > tmax:
             return tmax, tmin

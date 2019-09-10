@@ -551,6 +551,7 @@ def is_shadowed(world, point, ilight=0):
     direction = normalize(v)
     r = shapes.ray(point, direction)
     intersections = intersect_world(world, r)
+    intersections = [ i for i in intersections if i.object.material.casts_shadow ]
     h = shapes.hit(intersections)
 
     return h is not None and h.t < distance

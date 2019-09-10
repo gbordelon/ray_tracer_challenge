@@ -3,10 +3,10 @@
 # ======================================================
 
 - add: camera
-  width: 50
-  height: 50
-  field-of-view: 1
-  from: [-1, 2, -6]
+  width: 1024
+  height: 1024
+  field-of-view: 0.5
+  from: [-2, 3, -6]
   to: [0, 0, 0]
   up: [0, 1, 0]
 
@@ -15,7 +15,7 @@
 # ======================================================
 
 - add: light
-  at: [ 0, 100, -100 ]
+  at: [ 2, 10, -2 ]
   intensity: [ 1, 1, 1 ]
 
 # ======================================================
@@ -32,15 +32,21 @@
     right:
       add: sphere
       transform:
-      - [ translate, -0.6, 0.3, -0.6]
+      - [ translate, 0.2, 0.5, -0.3]
       material:
-        color: [ 1, 0, 0 ]
+        transparency: 1.0
+        casts-shadow: False
+        specular: 0
+        ambient: 0
+        diffuse: 0
     left:
       add: cube
-      transform:
-      - [ translate, 0, 0, 0 ]
       material:
         color: [ 1, 1, 0 ]
+        casts-shadow: False
+#        specular: 1
+#        diffuse: 1
+#        ambient: 0.0
 
 # ======================================================
 # Construct the scene itself
@@ -52,7 +58,7 @@
   - [ rotate-x, 1.5708 ]
   - [ translate, 0, 0, 100 ]
   material:
-    color: [ 0, 0, 0 ]
+    color: [ 1, 1, 1 ]
     ambient: 1
     diffuse: 0
     specular: 0
