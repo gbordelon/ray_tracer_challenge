@@ -108,6 +108,20 @@ def construct_ppm_header(canvas):
 255
 """.format(canvas.shape[0], canvas.shape[1])
 
+def construct_ppm_body(canvas):
+    body = bytearray()
+    for y in range(canvas.shape[1]):
+        for x in range(canvas.shape[0]):
+            for component in canvas[x, y]:
+                if component >= 1.0:
+                    scaled = 255
+                elif component <= 0:
+                    scaled = 0
+                else:
+                    scaled = (component * 255 + 0.5).astype(int)
+                body.append(scaled)
+    return body
+
 def construct_ppm(canvas):
     """
     >>> ca = canvas(5,3)
@@ -129,17 +143,7 @@ def construct_ppm(canvas):
     True
     """
     header = construct_ppm_header(canvas)
-    body = bytearray()
-    for y in range(canvas.shape[1]):
-        for x in range(canvas.shape[0]):
-            for component in canvas[x][y]:
-                if component >= 1.0:
-                    scaled = 255
-                elif component <= 0:
-                    scaled = 0
-                else:
-                    scaled = (component * 255 + 0.5).astype(int)
-                body.append(scaled)
+    body = construct_ppm_body(canvas)
     body.append(10)
     return b"".join([header.encode('utf-8'),body])
 

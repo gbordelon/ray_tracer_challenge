@@ -8,6 +8,8 @@ import shapes
 import itertools
 from multiprocessing import Pool
 import numpy as np
+from PIL import Image
+from random import shuffle
 
 EPSILON = 0.000001
 BLOCK_SIZE=2
@@ -801,11 +803,19 @@ def render_multi(cam, world, num_threads=4):
                    itertools.product(range(0, cam.hsize, BLOCK_SIZE),
                                      range(0, cam.vsize, BLOCK_SIZE))]
 
+    shuffle(window_idxs)
     with Pool(num_threads) as p:
-        _ = p.map(render_multi_helper, window_idxs)
+        future = p.map_async(render_multi_helper, window_idxs)
+
+        while not future.ready():
+            try:
+                future.wait(timeout=1800)
+            except TimeoutError as e:
+                pass
+            img = Image.frombytes(mode='RGB', size=(cam.hsize,cam.vsize), data=b"".join([construct_ppm_body(image)]))
+            img.show()
 
     return np.ctypeslib.as_array(image.shared_arr)
-    #return image.np_arr
 
 def normal_at(shape, world_point, hit):
     """
