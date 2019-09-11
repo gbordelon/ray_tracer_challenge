@@ -14,8 +14,8 @@
 # ======================================================
 
 - add: camera
-  width: 500
-  height: 200
+  width: 1200 #1200
+  height: 480 #480
   field-of-view: 1.2
   from: [0, 2.5, -10]
   to: [0, 1, 0]
@@ -48,7 +48,6 @@
 - define: raw-bbox
   value:
     add: cube
-    shadow: false
     transform:
     - [ translate, 1, 1, 1 ]
     - [ scale, 3.73335, 2.5845, 1.6283 ]
@@ -66,8 +65,9 @@
   value:
     add: raw-bbox
     transform:
-    - [ translate, 0, 0.1217, 0]
+#    - [ translate, 0, 0.1217, 0]
     - [ scale, 0.268, 0.268, 0.268 ]
+    - [ translate, 0, 0.12169, 0]
 
 - define: pedestal
   value:
@@ -102,6 +102,7 @@
         shininess: 15
     - add: bbox
       material:
+        shadow: False
         ambient: 0
         diffuse: 0.4
         specular: 0
@@ -127,6 +128,7 @@
         shininess: 15
     - add: bbox
       material:
+        shadow: False
         ambient: 0
         diffuse: 0.2
         specular: 0
@@ -152,6 +154,7 @@
         shininess: 15
     - add: bbox
       material:
+        shadow: False
         ambient: 0
         diffuse: 0.2
         specular: 0
@@ -177,6 +180,7 @@
         shininess: 15
     - add: bbox
       material:
+        shadow: False
         ambient: 0
         diffuse: 0.1
         specular: 0
@@ -202,11 +206,12 @@
         shininess: 15
     - add: bbox
       material:
+        shadow: False
         ambient: 0
         diffuse: 0.1
         specular: 0
         transparency: 0.9
-        refractive-index: 1
+        refractive-index: 1.0
 
 - add: group
   transform:

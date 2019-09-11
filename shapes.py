@@ -185,8 +185,8 @@ class Material(object):
         if 'refractive-index' in obj:
             refractive_index = float(obj['refractive-index'])
 
-        if 'casts-shadow' in obj:
-            casts_shadow = obj['casts-shadow']
+        if 'shadow' in obj:
+            casts_shadow = obj['shadow']
 
         return Material(color=c,
                         diffuse=diffuse,

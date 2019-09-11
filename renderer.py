@@ -280,7 +280,7 @@ def schlick(comps):
     r0 = ((comps.n1 - comps.n2) / (comps.n1 + comps.n2)) ** 2
     return r0 + (1.0 - r0) * (1.0 - cos) ** 5
 
-def refracted_color(world, comps, remaining=5, ilight=0):
+def refracted_color(world, comps, remaining=5):
     """
     >>> w = default_world()
     >>> shape = w.contains[0]
@@ -350,7 +350,7 @@ def refracted_color(world, comps, remaining=5, ilight=0):
         comps.object.material.transparency
     return c
 
-def reflected_color(world, comps, remaining=5, ilight=0):
+def reflected_color(world, comps, remaining=5):
     """
     >>> w = default_world()
     >>> r = ray(point(0,0,0), vector(0,0,1))
@@ -399,12 +399,11 @@ def reflected_color(world, comps, remaining=5, ilight=0):
         return color(0,0,0)
 
     reflect_ray = shapes.ray(comps.over_point, comps.reflectv)
-    c = color_at(world, reflect_ray, remaining - 1, ilight)
+    c = color_at(world, reflect_ray, remaining - 1)
 
     return c * comps.object.material.reflective
 
-# TODO ilight is currently ignored
-def shade_hit(world, comps, remaining=5, ilight=0):
+def shade_hit(world, comps, remaining=5):
     """
     >>> w = default_world()
     >>> r = ray(point(0,0,-5), vector(0,0,1))
@@ -502,26 +501,27 @@ def shade_hit(world, comps, remaining=5, ilight=0):
     >>> np.isclose(c, color(0.93391, 0.69643, 0.69243))
     array([ True,  True,  True])
     """
-    acc = color(0,0,0)
+    surface = color(0,0,0)
     for i in range(len(world.lights)):
         shadowed = is_shadowed(world, comps.over_point, i)
-        surface = lighting(comps.object.material,
+        surface += lighting(comps.object.material,
                            comps.object,
                            world.lights[i],
                            comps.over_point,
                            comps.eyev,
                            comps.normalv,
                            shadowed)
-        reflected = reflected_color(world, comps, remaining, i)
-        refracted = refracted_color(world, comps, remaining, i)
 
-        mat = comps.object.material
-        if mat.reflective > 0 and mat.transparency > 0:
-            reflectance = schlick(comps)
-            acc += surface + reflected * reflectance + refracted * (1.0 - reflectance)
-        else:
-            acc += surface + reflected + refracted
-    return acc
+    reflected = reflected_color(world, comps, remaining)
+    refracted = refracted_color(world, comps, remaining)
+
+    mat = comps.object.material
+    if mat.reflective > 0 and mat.transparency > 0:
+        reflectance = schlick(comps)
+        surface += surface + reflected * reflectance + refracted * (1.0 - reflectance)
+    else:
+        surface += surface + reflected + refracted
+    return surface
 
 def is_shadowed(world, point, ilight=0):
     """
@@ -558,7 +558,7 @@ def is_shadowed(world, point, ilight=0):
 
     return h is not None and h.t < distance
 
-def color_at(world, ray, remaining=5, ilight=0):
+def color_at(world, ray, remaining=5):
     """
     This method is called by render and prepares things for shade_hit
 
@@ -607,7 +607,7 @@ def color_at(world, ray, remaining=5, ilight=0):
     if i is None:
         return color(0,0,0)
     comps = prepare_computations(i, ray, xs)
-    return shade_hit(world, comps, remaining, ilight)
+    return shade_hit(world, comps, remaining)
 
 def view_transform(fr, to, up):
     """
@@ -807,13 +807,17 @@ def render_multi(cam, world, num_threads=4):
     with Pool(num_threads) as p:
         future = p.map_async(render_multi_helper, window_idxs)
 
+        i = 0
         while not future.ready():
             try:
-                future.wait(timeout=1800)
+                future.wait(timeout=600)
             except TimeoutError as e:
                 pass
             img = Image.frombytes(mode='RGB', size=(cam.hsize,cam.vsize), data=b"".join([construct_ppm_body(image)]))
-            img.show()
+            #img.show()
+            img.save('./bounding_box_images/{}.png'.format(i))
+            img.close()
+            i += 1
 
     return np.ctypeslib.as_array(image.shared_arr)
 
