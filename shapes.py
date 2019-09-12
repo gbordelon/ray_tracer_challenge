@@ -316,9 +316,6 @@ class CSG(Shape):
     def from_yaml(cls, tree, defines) -> 'CSG':
         mat = Material()
         xform = matrix4x4identity()
-        left = None
-        right = None
-        op = None
 
         if 'material' in tree:
             mat = Material.from_yaml(tree['material'])
@@ -390,7 +387,7 @@ class CSG(Shape):
         self.right.divide(threshold)
 
     def __repr__(self):
-        return "CSG: ({}) Left:\n{}\nRight:\n{} ".format(
+        return "{}: ({}) Left:\n{}\nRight:\n{} ".format(
             type(self).__name__,
             self.material.__repr__(),
             self.left.__repr__(),
@@ -481,21 +478,20 @@ class Group(Shape):
 
     def _make_subgroup(self, children):
         sub_group = Group(self.material, self.transform, children)
-        for c in children:
-            self.children.remove(c)
+        self.children.difference_update(children)
         self.add_child(sub_group)
 
     def _partition_children(self):
         left_box, right_box = self.bounds().split_bounds()
-        left_group = []
-        right_group = []
+        left_group = set()
+        right_group = set()
 
         for c in self.children:
             sub_box = c.bounds()
             if left_box.contains_box(sub_box):
-                left_group.append(c)
+                left_group.add(c)
             elif right_box.contains_box(sub_box):
-                right_group.append(c)
+                right_group.add(c)
         return left_group, right_group
 
     def __repr__(self):

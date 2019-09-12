@@ -6,6 +6,7 @@ from vector import *
 from datetime import datetime, timezone, timedelta
 import numpy as np
 import PIL.Image as Image
+import os
 
 def doctest():
     import doctest
@@ -301,7 +302,7 @@ def yaml_test(yaml_file_name, output_file_name):
     with open(output_file_name + 'ppm', 'wb') as f:
         f.write(ppm)
 
-def csg_test(yaml_file_path, output_file_path):
+def csg_test(yaml_file_path, output_dir_path):
     from yaml_parser import yaml_file_to_world_objects
 
     w = default_world()
@@ -329,7 +330,7 @@ def csg_test(yaml_file_path, output_file_path):
     print('Bounding volume constructed in {} seconds'.format(delta/1000000))
 
     print('canvas construction start at {}'.format(now))
-    ca = render_multi(cam, w, 4)
+    ca = render_multi(cam, w, 4, 600, output_dir_path)
 
     now = datetime.now(timezone.utc)
     epoch = datetime(1970, 1, 1, tzinfo=timezone.utc) # use POSIX epoch
@@ -338,17 +339,34 @@ def csg_test(yaml_file_path, output_file_path):
     print('canvas constructed in {} seconds.'.format(delta/1000000))
 
     ppm = construct_ppm(ca)
-    with open(output_file_path, 'wb') as f:
+    with open('{}/final.ppm'.format(output_dir_path), 'wb') as f:
         f.write(ppm)
 
+def bounding_box():
+    output_dir_path = './bounding_box_images'
+    input_yaml_file_path = '{}/bounding_boxes.yml'.format(output_dir_path)
+    output_file_name = '{}/final.ppm'.format(output_dir_path)
+    if not os.path.exists(output_dir_path):
+        os.makedirs(output_dir_path)
+    csg_test(input_yaml_file_path, output_dir_path)
+    im = Image.open(output_dir_path, 'r')
+    im.save(output_dir_path + output_file_name[:-3] + 'jpg')
+    im.close()
 
-if __name__ == '__main__':
-    input_yaml_file_path = './bounding_boxes.yml'
-    output_file_path = './bounding_boxes.ppm'
-    csg_test(input_yaml_file_path, output_file_path)
-    #import cProfile
-    #cProfile.run('csg_test(input_yaml_file_path, output_file_path)', sort='tottime')
-
+def area_light():
+    output_path = './shadow_glamour_shot'
+    input_yaml_file_path = '{}/shadow_glamour_shot.yml'.format(output_path)
+    output_file_path = '{}/final.ppm'.format(output_path)
+    if not os.path.exists(output_path):
+        os.makedirs(output_path)
+    csg_test(input_yaml_file_path, output_path)
     im = Image.open(output_file_path, 'r')
     im.save(output_file_path[:-3] + 'jpg')
     im.close()
+
+if __name__ == '__main__':
+    bounding_box()
+    #area_light()
+    #import cProfile
+    #cProfile.run('csg_test(input_yaml_file_path, output_file_path)', sort='tottime')
+

@@ -502,15 +502,15 @@ def shade_hit(world, comps, remaining=5):
     array([ True,  True,  True])
     """
     surface = color(0,0,0)
-    for i in range(len(world.lights)):
-        shadowed = is_shadowed(world, comps.over_point, i)
+    for light in world.lights:
+        intensity = light.intensity_at(world, comps.over_point)
         surface += lighting(comps.object.material,
                            comps.object,
-                           world.lights[i],
+                           light,
                            comps.over_point,
                            comps.eyev,
                            comps.normalv,
-                           shadowed)
+                           intensity)
 
     reflected = reflected_color(world, comps, remaining)
     refracted = refracted_color(world, comps, remaining)
@@ -523,7 +523,7 @@ def shade_hit(world, comps, remaining=5):
         surface += surface + reflected + refracted
     return surface
 
-def is_shadowed(world, point, ilight=0):
+def is_shadowed(world, light_position, point):
     """
     >>> w = default_world()
     >>> p = point(0,10,0)
@@ -547,8 +547,7 @@ def is_shadowed(world, point, ilight=0):
 
     """
 
-    light = world.lights[ilight]
-    v = light.position - point
+    v = light_position - point
     distance = magnitude(v)
     direction = normalize(v)
     r = shapes.ray(point, direction)
@@ -785,7 +784,7 @@ def render_multi_helper(args):
 
     write_pixels(image, buffer, window_x, window_y, BLOCK_SIZE)
 
-def render_multi(cam, world, num_threads=4):
+def render_multi(cam, world, num_threads=4, timeout_in_seconds=30, file_path='./'):
     """
     >>> w = default_world()
     >>> c = camera(11, 11, np.pi/2)
@@ -810,12 +809,11 @@ def render_multi(cam, world, num_threads=4):
         i = 0
         while not future.ready():
             try:
-                future.wait(timeout=600)
+                future.wait(timeout=timeout_in_seconds)
             except TimeoutError as e:
                 pass
             img = Image.frombytes(mode='RGB', size=(cam.hsize,cam.vsize), data=b"".join([construct_ppm_body(image)]))
-            #img.show()
-            img.save('./bounding_box_images/{}.png'.format(i))
+            img.save('{}/{}.png'.format(file_path, i))
             img.close()
             i += 1
 
@@ -883,14 +881,81 @@ class Light(object):
     def __init__(self, intensity):
         self.intensity = intensity
 
+    @classmethod
+    def from_yaml(cls, obj) -> 'Light':
+        if 'at' in obj:
+            return PointLight.from_yaml(obj)
+        elif 'corner' in obj:
+            return AreaLight.from_yaml(obj)
+
 class PointLight(Light):
     def __init__(self, position, intensity):
         Light.__init__(self, intensity)
         self.position = position
+        self.samples = 1
 
     @classmethod
     def from_yaml(cls, obj) -> 'PointLight':
         return cls(position=point(*obj['at']), intensity=color(*obj['intensity']))
+
+    def light_surface_points(self):
+        return [self.position]
+
+    def intensity_at(self, world, point):
+        if is_shadowed(world, self.position, point):
+            return 0.0
+        return 1.0
+
+import random
+class AreaLight(Light):
+    def __init__(self, corner, full_uvec, usteps, full_vvec, vsteps, jitter, intensity, random_seed=0):
+        self.corner = corner
+        self.uvec = full_uvec / usteps
+        self.usteps = usteps
+        self.vvec = full_vvec / vsteps
+        self.vsteps = vsteps
+        self.jitter = jitter
+        self.samples = usteps * vsteps
+        random.seed(random_seed)
+        Light.__init__(self, intensity)
+
+    @classmethod
+    def from_yaml(cls, obj) -> 'AreaLight':
+        return cls(corner=point(*obj['corner']),
+                   full_uvec=vector(*obj['uvec']),
+                   full_vvec=vector(*obj['vvec']),
+                   usteps=int(obj['usteps']),
+                   vsteps=int(obj['vsteps']),
+                   jitter=obj['jitter'],
+                   intensity=color(*obj['intensity']))
+
+    def _jitter_by(self):
+        if not self.jitter:
+            return 0.5
+        return random.random()
+
+    def _point_on_light(self, u, v):
+        return self.corner +\
+            self.uvec * (u + self._jitter_by()) +\
+            self.vvec * (v + self._jitter_by())
+
+    def light_surface_points(self):
+        pos = []
+        for v in range(self.vsteps):
+            for u in range(self.usteps):
+                pos.append(self._point_on_light(u, v))
+        return pos
+
+    def intensity_at(self, world, point):
+        total = 0.0
+        for v in range(self.vsteps):
+            for u in range(self.usteps):
+                pos = self._point_on_light(u, v)
+
+                if not is_shadowed(world, pos, point):
+                    total += 1.0
+
+        return total / self.samples
 
 def point_light(position, intensity):
     """
@@ -907,7 +972,7 @@ def point_light(position, intensity):
     return PointLight(position, intensity)
 
 black = color(0,0,0)
-def lighting(material, shape, light, point, eyev, normalv, in_shadow=False):
+def lighting(material, shape, light, point, eyev, normalv, shade_intensity=1.0):
     """
     >>> m = material()
     >>> shape = sphere()
@@ -990,21 +1055,25 @@ def lighting(material, shape, light, point, eyev, normalv, in_shadow=False):
 
     effective_color = pcolor * light.intensity
     ambient = effective_color * material.ambient
-    if in_shadow:
+    if shade_intensity == 0.0: # full shadow
         return ambient
 
-    lightv = normalize(light.position - point)
-    light_dot_normal = dot(lightv, normalv)
-    if light_dot_normal < 0:
-        diffuse = black
-        specular = black
-    else:
-        diffuse = effective_color * material.diffuse * light_dot_normal
-        reflectv = reflect(-lightv, normalv)
-        reflect_dot_eye = dot(reflectv, eyev)
-        if reflect_dot_eye <= 0:
-            specular = black
+    acc = color(0,0,0)
+    for position in light.light_surface_points():
+        lightv = normalize(position - point)
+        light_dot_normal = dot(lightv, normalv)
+        if light_dot_normal < 0:
+            pass
         else:
-            factor = np.power(reflect_dot_eye, material.shininess)
-            specular = light.intensity * material.specular * factor
-    return ambient + diffuse + specular
+            diffuse = effective_color * material.diffuse * light_dot_normal
+            acc += diffuse
+
+            reflectv = reflect(-lightv, normalv)
+            reflect_dot_eye = dot(reflectv, eyev)
+            if reflect_dot_eye <= 0:
+                pass
+            else:
+                factor = np.power(reflect_dot_eye, material.shininess)
+                specular = light.intensity * material.specular * factor
+                acc += specular
+    return ambient + (acc / light.samples) * shade_intensity

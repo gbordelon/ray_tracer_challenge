@@ -1,4 +1,4 @@
-from renderer import Camera, PointLight
+from renderer import Camera, Light
 from shapes import Shape, Group, Material
 from matrix import matrix4x4identity
 
@@ -49,7 +49,7 @@ def yaml_file_to_world_objects(file_path):
             if obj["add"] == "camera":
                 rv['camera'] = Camera.from_yaml(obj)
             elif obj["add"] == "light":
-                rv['lights'].append(PointLight.from_yaml(obj))
+                rv['lights'].append(Light.from_yaml(obj))
             else:
                 possible_item = recursive_add(obj, defines)
                 if possible_item is not None:
