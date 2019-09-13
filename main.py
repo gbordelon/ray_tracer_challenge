@@ -320,7 +320,8 @@ def csg_test(yaml_file_path, output_dir_path):
     posix_timestamp_micros_before = (now - epoch) / timedelta(microseconds=1)
 
     print('Bounding volume construction start at {}'.format(now))
-    gs[0].divide(1)
+    # TODO hacked from 1 to fix recursion failure with capped cylinders.
+    gs[0].divide(2)
     w.contains.extend(yaml_objs['world'])
 
     now = datetime.now(timezone.utc)
@@ -330,7 +331,8 @@ def csg_test(yaml_file_path, output_dir_path):
     print('Bounding volume constructed in {} seconds'.format(delta/1000000))
 
     print('canvas construction start at {}'.format(now))
-    ca = render_multi(cam, w, 4, 600, output_dir_path)
+    ca = render_multi(cam, w, 4, 30, output_dir_path)
+    #ca = render(cam, w)
 
     now = datetime.now(timezone.utc)
     epoch = datetime(1970, 1, 1, tzinfo=timezone.utc) # use POSIX epoch
@@ -364,9 +366,54 @@ def area_light():
     im.save(output_file_path[:-3] + 'jpg')
     im.close()
 
+def texture_mapping_sphere():
+    path = './texture_mapping/checkered_sphere'
+    input_yaml_file_path = '{}/checkered_sphere.yml'.format(path)
+    output_file_path = '{}/final.ppm'.format(path)
+    if not os.path.exists(path):
+        os.makedirs(path)
+    csg_test(input_yaml_file_path, path)
+    im = Image.open(output_file_path, 'r')
+    im.save(output_file_path[:-3] + 'jpg')
+    im.close()
+
+def texture_mapping_plane():
+    path = './texture_mapping/checkered_plane'
+    input_yaml_file_path = '{}/checkered_plane.yml'.format(path)
+    output_file_path = '{}/final.ppm'.format(path)
+    if not os.path.exists(path):
+        os.makedirs(path)
+    csg_test(input_yaml_file_path, path)
+    im = Image.open(output_file_path, 'r')
+    im.save(output_file_path[:-3] + 'jpg')
+    im.close()
+
+def texture_mapping_cylinder():
+    path = './texture_mapping/checkered_cylinder'
+    input_yaml_file_path = '{}/checkered_cylinder.yml'.format(path)
+    output_file_path = '{}/final.ppm'.format(path)
+    if not os.path.exists(path):
+        os.makedirs(path)
+    csg_test(input_yaml_file_path, path)
+    im = Image.open(output_file_path, 'r')
+    im.save(output_file_path[:-3] + 'jpg')
+    im.close()
+
+def texture_mapping_cube():
+    path = './texture_mapping/checkered_cube'
+    input_yaml_file_path = '{}/checkered_cube.yml'.format(path)
+    output_file_path = '{}/final.ppm'.format(path)
+    if not os.path.exists(path):
+        os.makedirs(path)
+    csg_test(input_yaml_file_path, path)
+    im = Image.open(output_file_path, 'r')
+    im.save(output_file_path[:-3] + 'jpg')
+    im.close()
+
 if __name__ == '__main__':
+    texture_mapping_cylinder()
     #bounding_box()
-    area_light()
+    #area_light()
     #import cProfile
     #cProfile.run('csg_test(input_yaml_file_path, output_file_path)', sort='tottime')
 

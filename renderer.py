@@ -73,7 +73,8 @@ def intersect_world(world, r):
     """
     xs = []
     for obj in world.contains:
-        xs.extend(shapes.intersect(obj, r))
+        xs_1 = shapes.intersect(obj, r)
+        xs.extend(xs_1)
     return shapes.intersections(*xs)
 
 class Computations(object):

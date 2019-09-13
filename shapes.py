@@ -1,11 +1,11 @@
 from canvas import *
 from matrix import *
-from pattern import *
 from renderer import *
 from vector import *
 
 from copy import deepcopy
 from functools import lru_cache
+EPSILON = 0.000001
 
 class BoundingBox(object):
     def __init__(self, min=point(np.inf, np.inf, np.inf), max=point(-np.inf, -np.inf, -np.inf)):
@@ -135,7 +135,7 @@ class BoundingBox(object):
         return 'BoundingBox: {} {}'.format(self.min, self.max)
 
 class Material(object):
-    def __init__(self, color=color(1,1,1), ambient=0.1, diffuse=0.9, specular=0.9, shininess=200.0, reflective=0.0, transparency=0.0, refractive_index=1.0, casts_shadow=True):
+    def __init__(self, color=color(1,1,1), ambient=0.1, diffuse=0.9, specular=0.9, shininess=200.0, reflective=0.0, transparency=0.0, refractive_index=1.0, casts_shadow=True, pattern=None):
         if ambient < 0 or diffuse < 0 or specular < 0 or shininess < 0:
             raise ValueError("Materials expect non-negative floating point values.")
         self.color = color
@@ -143,10 +143,10 @@ class Material(object):
         self.diffuse = np.float64(diffuse)
         self.specular = np.float64(specular)
         self.shininess = np.float64(shininess)
-        self.pattern = None
-        self.reflective = reflective
-        self.transparency = transparency
-        self.refractive_index = refractive_index
+        self.pattern = pattern
+        self.reflective = np.float64(reflective)
+        self.transparency = np.float64(transparency)
+        self.refractive_index = np.float64(refractive_index)
         self.casts_shadow = casts_shadow
 
     @classmethod
@@ -160,33 +160,38 @@ class Material(object):
         transparency = 0.0
         refractive_index = 1.0
         casts_shadow = True
+        pat = None
 
-        if 'color' in obj:
-            c = color(*obj['color'])
+        if obj is not None:
+            if 'color' in obj:
+                c = color(*obj['color'])
 
-        if 'diffuse' in obj:
-            diffuse = float(obj['diffuse'])
+            if 'diffuse' in obj:
+                diffuse = float(obj['diffuse'])
 
-        if 'ambient' in obj:
-            ambient = float(obj['ambient'])
+            if 'ambient' in obj:
+                ambient = float(obj['ambient'])
 
-        if 'specular' in obj:
-            specular = float(obj['specular'])
+            if 'specular' in obj:
+                specular = float(obj['specular'])
 
-        if 'shininess' in obj:
-            shininess = float(obj['shininess'])
+            if 'shininess' in obj:
+                shininess = float(obj['shininess'])
 
-        if 'reflective' in obj:
-            reflective = float(obj['reflective'])
+            if 'reflective' in obj:
+                reflective = float(obj['reflective'])
 
-        if 'transparency' in obj:
-            transparency = float(obj['transparency'])
+            if 'transparency' in obj:
+                transparency = float(obj['transparency'])
 
-        if 'refractive-index' in obj:
-            refractive_index = float(obj['refractive-index'])
+            if 'refractive-index' in obj:
+                refractive_index = float(obj['refractive-index'])
 
-        if 'shadow' in obj:
-            casts_shadow = obj['shadow']
+            if 'shadow' in obj:
+                casts_shadow = obj['shadow']
+
+            if 'pattern' in obj:
+                pat = Pattern.from_yaml(obj['pattern'])
 
         return Material(color=c,
                         diffuse=diffuse,
@@ -196,10 +201,11 @@ class Material(object):
                         reflective=reflective,
                         transparency=transparency,
                         refractive_index=refractive_index,
-                        casts_shadow=casts_shadow)
+                        casts_shadow=casts_shadow,
+                        pattern=pat)
 
     def __repr__(self):
-        return "Material c: {} a: {} d: {} sp: {} sh: {} refl: {} trans: {} refr: {} shadow:".format(
+        return "Material c: {} a: {} d: {} sp: {} sh: {} refl: {} trans: {} refr: {} shadow: {} Pattern: {}".format(
             self.color,
             self.ambient,
             self.diffuse,
@@ -208,12 +214,16 @@ class Material(object):
             self.reflective,
             self.transparency,
             self.refractive_index,
-            self.casts_shadow)
+            self.casts_shadow,
+            self.pattern)
 
 class Ray(object):
     def __init__(self, o, d):
         self.origin = o
         self.direction = d
+
+    def __repr__(self):
+        return "Ray: {} {}".format(self.origin, self.direction)
 
 class Shape(object):
     def __init__(self, material=Material(), transform=matrix4x4identity()):
@@ -438,24 +448,23 @@ class Group(Shape):
 
     def local_intersect(self, ray_local):
         bbox = self.bounds()
-
-        if len(bbox.intersect(ray_local)) > 0:
+        if True or len(bbox.intersect(ray_local)) > 0:
             xs = []
-            for shape in self.children:
-                xs.extend(shape.intersect(ray_local))
+            for sh in self.children:
+                xs.extend(sh.intersect(ray_local))
             return intersections(*xs)
         return []
 
-    def add_child(self, shapes):
-        if self is shapes:
+    def add_child(self, shs):
+        if self is shs:
             raise ValueError("Don't add a group to its own children collection.")
-        if type(shapes) == set or type(shapes) == list:
-            self.children.update(shapes)
-            for sh in shapes:
+        if type(shs) == set or type(shs) == list:
+            self.children.update(shs)
+            for sh in shs:
                 sh.parent = self
         else:
-            self.children.add(shapes)
-            shapes.parent = self
+            self.children.add(shs)
+            shs.parent = self
 
     @lru_cache(maxsize=CACHE_SIZE)
     def bounds(self):
@@ -710,7 +719,9 @@ class Cylinder(Shape):
 
     @classmethod
     def from_yaml(cls, obj) -> 'Cylinder':
-        b = obj['closed']
+        b = True
+        if 'closed' in obj:
+            b = obj['closed']
         return cls(material=Material.from_yaml(obj['material']),
                    transform=Transform.from_yaml(obj['transform']),
                    minimum=obj['min'],
@@ -739,11 +750,11 @@ class Cylinder(Shape):
                 t1 = tmp
 
             y0 = ray_local.origin[1] + t0 * ray_local.direction[1]
-            if self.minimum < y0 and y0 < self.maximum:
+            if self.minimum < y0 < self.maximum:
                 xs.append(intersection(t0, self))
 
             y1 = ray_local.origin[1] + t1 * ray_local.direction[1]
-            if self.minimum < y1 and y1 < self.maximum:
+            if self.minimum < y1 < self.maximum:
                 xs.append(intersection(t1, self))
 
         self._intersect_caps(ray_local, xs)
@@ -1274,7 +1285,7 @@ def glass_sphere():
     s.material.refractive_index = 1.5
     return s
 
-def intersect(shape, ray):
+def intersect(sh, ray):
     """
     >>> r = ray(point(0,0,-5), vector(0,0,1))
     >>> s = sphere()
@@ -1336,7 +1347,7 @@ def intersect(shape, ray):
     >>> len(xs) == 0
     True
     """
-    return shape.intersect(ray)
+    return sh.intersect(ray)
 
 def intersection_with_uv(t, obj, u, v):
     return Intersection(t, obj, u, v)
@@ -1425,11 +1436,11 @@ def transform(r, matrix):
     return ray(matrix * r.origin,
                matrix * r.direction)
 
-def world_to_object(shape, pt):
-    return shape.world_to_object(pt)
+def world_to_object(sh, pt):
+    return sh.world_to_object(pt)
 
-def normal_to_world(shape, normal):
-    return shape.normal_to_world(normal)
+def normal_to_world(sh, normal):
+    return sh.normal_to_world(normal)
 
 def test_shape():
     return Shape()
@@ -1468,6 +1479,511 @@ def material():
     True
     """
     return Material(color(1,1,1),0.1,0.9,0.9,200.0)
+
+
+
+import noise
+
+BLACK = color(0,0,0)
+WHITE = color(1,1,1)
+
+class Pattern(object):
+    def __init__(self, color1=WHITE, color2=BLACK):
+        self.transform = matrix4x4identity()
+        self.a = color1
+        self.b = color2
+
+    @classmethod
+    def from_yaml(cls, obj) -> 'Pattern':
+        typ = obj['type']
+        # base patterns
+        if typ == 'checkers':
+            color1 = color(*obj['colors'][0])
+            color2 = color(*obj['colors'][1])
+            return Checkers(color1=color1, color2=color2)
+        elif typ == 'gradient':
+            color1 = color(*obj['colors'][0])
+            color2 = color(*obj['colors'][1])
+            return Gradient(color1=color1, color2=color2)
+        elif typ == 'radial-gradient':
+            color1 = color(*obj['colors'][0])
+            color2 = color(*obj['colors'][1])
+            return RadialGradient(color1=color1, color2=color2)
+        elif typ == 'ring':
+            color1 = color(*obj['colors'][0])
+            color2 = color(*obj['colors'][1])
+            return Ring(color1=color1, color2=color2)
+        elif typ == 'stripe':
+            color1 = color(*obj['colors'][0])
+            color2 = color(*obj['colors'][1])
+            return Stripe(color1=color1, color2=color2)
+
+        # nested patterns
+        elif typ == 'blended':
+            return BlendedPattern(pattern1=Pattern.from_yaml(obj['left']),
+                                  pattern2=Pattern.from_yaml(obj['right']))
+        elif typ == 'nested':
+            return NestedPattern(pattern1=Pattern.from_yaml(obj['primary']),
+                                 pattern2=Pattern.from_yaml(obj['left']),
+                                 pattern3=Pattern.from_yaml(obj['right']))
+        elif typ == 'perturbed':
+            freq = 0.4
+            scale_factor = 0.3
+            octaves = 1
+            if 'frequency' in obj:
+                freq = np.float64(obj['frequency'])
+            if 'scale-factor' in obj:
+                scale_factor = np.float64(obj['scale-factor'])
+            if 'octaves' in obj:
+                octaves = obj['octaves']
+            return PerturbedPattern(pattern1=Pattern.from_yaml(obj['primary']),
+                                    frequency=freq,
+                                    scale_factor=scale_factor,
+                                    octaves=octaves)
+
+        # uv mapped patterns
+        elif typ == 'map':
+            mapping = obj['mapping']
+            if mapping == 'cube':
+                return CubeMapPattern(uv_left=Pattern.uv_from_yaml(obj['left']),
+                                      uv_front=Pattern.uv_from_yaml(obj['front']),
+                                      uv_right=Pattern.uv_from_yaml(obj['right']),
+                                      uv_back=Pattern.uv_from_yaml(obj['back']),
+                                      uv_up=Pattern.uv_from_yaml(obj['up']),
+                                      uv_down=Pattern.uv_from_yaml(obj['down']),
+                                      uv_map=CubeUVMap)
+            # TODO consider supporting both caps
+            elif mapping == 'cylindrical':
+                if 'uv_pattern' in obj:
+                    uv_cap = Pattern.uv_from_yaml(obj['uv_pattern'])
+                    uv_body = Pattern.uv_from_yaml(obj['uv_pattern'])
+                else:
+                    uv_cap = Pattern.uv_from_yaml(obj['top'])
+                    uv_body = Pattern.uv_from_yaml(obj['front'])
+                return CylinderMapPattern(uv_cap=uv_cap,
+                                          uv_body=uv_body,
+                                          uv_map=CylinderUVMap)
+            elif mapping == 'planar':
+                return TextureMapPattern(uv_pattern=Pattern.uv_from_yaml(obj['uv_pattern']),
+                                         uv_map=PlaneUVMap)
+            elif mapping == 'spherical':
+                return TextureMapPattern(uv_pattern=Pattern.uv_from_yaml(obj['uv_pattern']),
+                                         uv_map=SphereUVMap)
+        raise ValueError('Unable to parse pattern type: {}'.format(typ))
+
+    @classmethod
+    def uv_from_yaml(cls, obj):
+        typ = obj['type']
+        if typ == 'checkers':
+            # colors is a list
+            color1 = color(*obj['colors'][0])
+            color2 = color(*obj['colors'][1])
+            return UVChecker(color1=color1, color2=color2, width=obj['width'], height=obj['height'])
+        elif typ == 'align_check':
+            colors = obj['colors'] # dict
+            return UVAlignCheck(main_color=colors['main'],
+                                upper_left=colors['ul'],
+                                upper_right=colors['ur'],
+                                bottom_left=colors['bl'],
+                                bottom_right=colors['br'])
+        elif typ == 'image':
+            raise NotImplementedError('I still need to implement uv image mapping.')
+
+        raise ValueError('Unable to parse uv pattern type: {}'.format(typ))
+
+    # testing impl
+    def pattern_at(self, pt):
+        return color(pt[0], pt[1], pt[2])
+
+    def pattern_at_shape(self, sh, pt):
+        """
+        >>> shape = sphere()
+        >>> shape.transform = scaling(2,2,2)
+        >>> pattern = stripe_pattern(WHITE, BLACK)
+        >>> c = pattern.pattern_at_shape(shape, point(1.5,0,0))
+        >>> c == color(1,1,1)
+        array([ True,  True,  True])
+
+        >>> shape = sphere()
+        >>> pattern = stripe_pattern(WHITE, BLACK)
+        >>> pattern.transform = scaling(2,2,2)
+        >>> c = pattern.pattern_at_shape(shape, point(1.5,0,0))
+        >>> c == color(1,1,1)
+        array([ True,  True,  True])
+
+        >>> shape = sphere()
+        >>> shape.transform = scaling(2,2,2)
+        >>> pattern = stripe_pattern(WHITE, BLACK)
+        >>> pattern.transform = translation(0.5,0,0)
+        >>> c = pattern.pattern_at_shape(shape, point(1.5,0,0))
+        >>> c == color(1,1,1)
+        array([ True,  True,  True])
+
+        >>> shape = sphere()
+        >>> shape.transform = scaling(2,2,2)
+        >>> pat = Pattern()
+        >>> c = pat.pattern_at_shape(shape, point(2,3,4))
+        >>> np.isclose(c, color(1,1.5,2))
+        array([ True,  True,  True])
+
+        >>> shape = sphere()
+        >>> pat = Pattern()
+        >>> pat.transform = scaling(2,2,2)
+        >>> c = pat.pattern_at_shape(shape, point(2,3,4))
+        >>> np.isclose(c, color(1,1.5,2))
+        array([ True,  True,  True])
+
+        >>> shape = sphere()
+        >>> shape.transform = scaling(2,2,2)
+        >>> pat = Pattern()
+        >>> pat.transform = translation(0.5,1,1.5)
+        >>> c = pat.pattern_at_shape(shape, point(2.5,3,3.5))
+        >>> np.isclose(c, color(0.75,0.5,0.25))
+        array([ True,  True,  True])
+
+        """
+        object_point = sh.world_to_object(pt)
+        pattern_point = inverse(self.transform) * object_point
+        return self.pattern_at(pattern_point)
+
+    def _get_color_1(self):
+        return self.a
+
+    def _get_color_2(self):
+        return self.b
+
+    def _predicate_eval(self, pred):
+        if pred:
+            return self._get_color_1()
+        return self._get_color_2()
+
+
+#######################
+#
+# UV Maps for Abstract patterns
+#
+#######################
+class SphereUVMap(object):
+    @classmethod
+    def uv_map(cls, object_point) -> 'tuple':
+        u = 0.5 + np.arctan2(object_point[2], object_point[0]) / (2 * np.pi)
+        v = 0.5 - np.arcsin(object_point[1]) / np.pi
+        return u,v
+
+
+# TODO figure out how to pick which of the three faces
+# TODO using the cube method is not correct. It distorts near the caps
+class CylinderUVMap(object):
+    @classmethod
+    def uv_map(cls, object_point) -> 'tuple':
+        face = cls._face_from_point(object_point)
+        if face == 0:
+            return face, cls._uv_cylinder_body(object_point)
+        elif face == 1:
+            return face, cls._uv_cylinder_cap(object_point)
+        raise ValueError('Unknown cylinder face: {}'.format(face))
+
+    @classmethod
+    def _face_from_point(cls, pt):
+        return 0
+
+    @classmethod
+    def _uv_cylinder_body(cls, object_point):
+        theta = np.arctan2(object_point[2], object_point[0])
+        raw_u = theta / (2 * np.pi)
+        u = 1 - (raw_u + 0.5)
+        v = object_point[1] % 1
+        return u,v
+
+    @classmethod
+    def _uv_cylinder_cap(cls, object_point) -> 'tuple':
+        # TODO change me
+        theta = np.arctan2(object_point[2], object_point[0])
+        raw_u = theta / (2 * np.pi)
+        u = 1 - (raw_u + 0.5)
+        v = object_point[1] % 1
+        return u,v
+
+
+class PlaneUVMap(object):
+    @classmethod
+    def uv_map(cls, object_point) -> 'tuple':
+        u = object_point[0] % 1
+        v = object_point[2] % 1
+        return u,v
+
+
+class CubeUVMap(object):
+    @classmethod
+    def uv_map(cls, object_point) -> 'tuple':
+        face = cls._face_from_point(object_point)
+        if face == 0:
+            return face, cls._uv_cube_right(object_point)
+        elif face == 1:
+            return face, cls._uv_cube_left(object_point)
+        elif face == 2:
+            return face, cls._uv_cube_up(object_point)
+        elif face == 3:
+            return face, cls._uv_cube_down(object_point)
+        elif face == 4:
+            return face, cls._uv_cube_front(object_point)
+        elif face == 5:
+            return face, cls._uv_cube_back(object_point)
+        raise ValueError('Unknown cube face: {}'.format(face))
+
+
+    @classmethod
+    def _face_from_point(cls, pt):
+        abs_x = abs(pt[0])
+        abs_y = abs(pt[1])
+        abs_z = abs(pt[2])
+        coord = max(abs_x, abs_y, abs_z)
+
+        if coord == pt[0]:
+            return 0
+        elif coord == -pt[0]:
+            return 1
+        elif coord == pt[1]:
+            return 2
+        elif coord == -pt[1]:
+            return 3
+        elif coord == pt[2]:
+            return 4
+        return 5
+
+    @classmethod
+    def _uv_cube_left(cls, pt):
+        u = ((pt[2] + 1) % 2.0) / 2.0
+        v = ((pt[1] + 1) % 2.0) / 2.0
+        return u,v
+
+    @classmethod
+    def _uv_cube_right(cls, pt):
+        u = ((1 - pt[2]) % 2.0) / 2.0
+        v = ((pt[1] + 1) % 2.0) / 2.0
+        return u,v
+
+    @classmethod
+    def _uv_cube_front(cls, pt):
+        u = ((pt[0] + 1) % 2.0) / 2.0
+        v = ((pt[1] + 1) % 2.0) / 2.0
+        return u,v
+
+    @classmethod
+    def _uv_cube_back(cls, pt):
+        u = ((1 - pt[0]) % 2.0) / 2.0
+        v = ((pt[1] + 1) % 2.0) / 2.0
+        return u,v
+
+    @classmethod
+    def _uv_cube_up(cls, pt):
+        u = ((pt[0] + 1) % 2.0) / 2.0
+        v = ((1 - pt[2]) % 2.0) / 2.0
+        return u,v
+
+    @classmethod
+    def _uv_cube_down(cls, pt):
+        u = ((pt[0] + 1) % 2.0) / 2.0
+        v = ((pt[2] + 1) % 2.0) / 2.0
+        return u,v
+
+
+#######################
+#
+# Abstract patterns
+#
+#######################
+class TextureMapPattern(Pattern):
+    def __init__(self, uv_pattern, uv_map):
+        Pattern.__init__(self, uv_pattern.a, uv_pattern.b)
+        self.uv_pattern = uv_pattern
+        self.uv_map = uv_map
+
+    def pattern_at(self, pt):
+        return self.uv_pattern.uv_pattern_at(*self.uv_map.uv_map(pt))
+
+
+class CubeMapPattern(Pattern):
+    def __init__(self, uv_left, uv_front, uv_right, uv_back, uv_up, uv_down, uv_map):
+        Pattern.__init__(self, WHITE, BLACK)
+        self.faces = [uv_right, uv_left, uv_up, uv_down, uv_front, uv_back] # order matters
+        self.uv_map = uv_map
+
+    def pattern_at(self, pt):
+        face, (u, v) = self.uv_map.uv_map(pt)
+        return self.faces[face].uv_pattern_at(u,v)
+
+
+class CylinderMapPattern(Pattern):
+    def __init__(self, uv_cap, uv_body, uv_map):
+        Pattern.__init__(self, WHITE, BLACK)
+        self.faces = [uv_body, uv_cap] # order matters
+        self.uv_map = uv_map
+
+    def pattern_at(self, pt):
+        face, (u, v) = self.uv_map.uv_map(pt)
+        return self.faces[face].uv_pattern_at(u,v)
+
+
+class BlendedPattern(Pattern):
+    def __init__(self, pattern1, pattern2):
+        Pattern.__init__(self, pattern1.a, pattern1.b)
+        self.p1 = pattern1
+        self.p2 = pattern2
+
+        # TODO should be a copy or pattern1...
+        if pattern2 is None:
+            self.p2 = pattern1
+
+    def pattern_at_shape(self, sh, pt):
+        p1 = self.p1.pattern_at_shape(sh, pt)
+        p2 = self.p2.pattern_at_shape(sh, pt)
+        return (p1 + p2) / 2
+
+
+class NestedPattern(Pattern):
+    def __init__(self, pattern1, pattern2, pattern3):
+        Pattern.__init__(self, pattern1.a, pattern1.b)
+        self.p1 = pattern1
+        self.p2 = pattern2
+        self.p3 = pattern3
+
+        if pattern2 is None:
+            self.p2 = pattern1
+        if pattern3 is None:
+            self.p3 = pattern1
+
+    def pattern_at_shape(self, sh, pt):
+        self.p1.a = self.p2.pattern_at_shape(sh, pt)
+        self.p1.b = self.p3.pattern_at_shape(sh, pt)
+        return self.p1.pattern_at_shape(sh, pt)
+
+
+class PerturbedPattern(Pattern):
+    """
+    With a frequency of 0.4 scale_factor works well at 1/3 of the scale of the
+    patterns. E.g. an x-axis gradient (from 0 to 1) scaled at 6,1,1 works well
+    with a scale_factor of 2
+    """
+    def __init__(self, pattern1, frequency=0.4, scale_factor=0.3, octaves=1):
+        Pattern.__init__(self, pattern1.a, pattern1.b)
+        self.p1 = pattern1
+        self.freq = frequency
+        self.scale_factor = scale_factor
+        self.octaves = octaves
+
+    def _perturb(self, pt):
+        x = pt[0] / self.freq
+        y = pt[1] / self.freq
+        z = pt[2] / self.freq
+
+        new_x = pt[0] + noise.pnoise3(x, y, z, self.octaves) * self.scale_factor
+        z += 1.0
+        new_y = pt[1] + noise.pnoise3(x, y, z, self.octaves) * self.scale_factor
+        z += 1.0
+        new_z = pt[2] + noise.pnoise3(x, y, z, self.octaves) * self.scale_factor
+
+        return point(new_x, new_y, new_z)
+
+    def pattern_at_shape(self, sh, pt):
+        return self.p1.pattern_at_shape(sh, self._perturb(pt))
+
+
+#######################
+#
+# UV patterns
+#
+#######################
+class UVChecker(Pattern):
+    def __init__(self, color1=WHITE, color2=BLACK, width=2, height=2):
+        Pattern.__init__(self, color1, color2)
+        self.width = width
+        self.height = height
+
+    def uv_pattern_at(self, u, v):
+        u2 = np.floor(u * self.width)
+        v2 = np.floor(v * self.height)
+        return self._predicate_eval((u2 + v2) % 2 == 0)
+
+
+class UVAlignCheck(Pattern):
+    def __init__(self, main_color, upper_left, upper_right, bottom_left, bottom_right):
+        Pattern.__init__(self, WHITE, BLACK)
+        self.main = main_color
+        self.ul = upper_left
+        self.ur = upper_right
+        self.bl = bottom_left
+        self.br = bottom_right
+
+    def uv_pattern_at(self, u, v):
+        # remember: v=0 at the bottom, v=1 at the top
+        if v > 0.8:
+            if u < 0.2:
+                return self.ul
+            if u > 0.8:
+                return self.ur
+        elif v < 0.2:
+            if u < 0.2:
+                return self.bl
+            if u > 0.8:
+                return self.br
+
+        return self.main
+
+
+#######################
+#
+# Concrete patterns
+#
+#######################
+class Checkers(Pattern):
+    def __init__(self, color1=WHITE, color2=BLACK):
+        Pattern.__init__(self, color1, color2)
+
+    def pattern_at(self, pattern_point):
+        new_point = np.floor(pattern_point.arr)
+        s = new_point[0] + new_point[1] + new_point[2]
+        return self._predicate_eval(np.isclose((s % 2), 0))
+
+
+class Gradient(Pattern):
+    def __init__(self, color1=WHITE, color2=BLACK):
+        Pattern.__init__(self, color1, color2)
+
+    def pattern_at(self, pattern_point):
+        distance = self.b - self.a
+        fraction = pattern_point[0] - np.floor(pattern_point[0])
+        return self.a + distance * fraction
+
+
+class RadialGradient(Pattern):
+    def __init__(self, color1=WHITE, color2=BLACK):
+        Pattern.__init__(self, color1, color2)
+
+    def pattern_at(self, pattern_point):
+        color_a = self._get_color_1()
+        distance = self._get_color_2() - color_a
+        mag = np.sqrt(pattern_point[0] ** 2 + pattern_point[2] ** 2)
+        fraction = mag - np.floor(mag)
+        return color_a + distance * fraction
+
+
+class Ring(Pattern):
+    def __init__(self, color1=WHITE, color2=BLACK):
+        Pattern.__init__(self, color1, color2)
+
+    def pattern_at(self, pattern_point):
+        return self._predicate_eval(
+            np.floor(np.sqrt(pattern_point[0] ** 2 + pattern_point[2] ** 2)) % 2 == 0)
+
+
+class Stripe(Pattern):
+    def __init__(self, color1=WHITE, color2=BLACK):
+        Pattern.__init__(self, color1, color2)
+
+    def pattern_at(self, pattern_point):
+        return self._predicate_eval(np.floor(pattern_point[0]) % 2 == 0)
+
 
 if __name__ == '__main__':
     pass
