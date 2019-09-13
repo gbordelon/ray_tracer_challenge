@@ -320,8 +320,7 @@ def csg_test(yaml_file_path, output_dir_path):
     posix_timestamp_micros_before = (now - epoch) / timedelta(microseconds=1)
 
     print('Bounding volume construction start at {}'.format(now))
-    # TODO hacked from 1 to fix recursion failure with capped cylinders.
-    gs[0].divide(2)
+    gs[0].divide(1)
     w.contains.extend(yaml_objs['world'])
 
     now = datetime.now(timezone.utc)
@@ -341,8 +340,12 @@ def csg_test(yaml_file_path, output_dir_path):
     print('canvas constructed in {} seconds.'.format(delta/1000000))
 
     ppm = construct_ppm(ca)
-    with open('{}/final.ppm'.format(output_dir_path), 'wb') as f:
+    ppm_scaled_brightness = construct_ppm(ca, False)
+    with open('{}/final_clamped.ppm'.format(output_dir_path), 'wb') as f:
         f.write(ppm)
+
+    with open('{}/final.ppm'.format(output_dir_path), 'wb') as f:
+        f.write(ppm_scaled_brightness)
 
 def bounding_box():
     output_dir_path = './bounding_box_images'
@@ -410,8 +413,41 @@ def texture_mapping_cube():
     im.save(output_file_path[:-3] + 'jpg')
     im.close()
 
+def texture_mapping_image():
+    path = './texture_mapping/earth'
+    input_yaml_file_path = '{}/earth.yml'.format(path)
+    output_file_path = '{}/final.ppm'.format(path)
+    if not os.path.exists(path):
+        os.makedirs(path)
+    csg_test(input_yaml_file_path, path)
+    im = Image.open(output_file_path, 'r')
+    im.save(output_file_path[:-3] + 'jpg')
+    im.close()
+
+def skybox():
+    path = './texture_mapping/skybox'
+    input_yaml_file_path = '{}/skybox.yml'.format(path)
+    output_file_path = '{}/final.ppm'.format(path)
+    if not os.path.exists(path):
+        os.makedirs(path)
+    csg_test(input_yaml_file_path, path)
+    im = Image.open(output_file_path, 'r')
+    im.save(output_file_path[:-3] + 'jpg')
+    im.close()
+
+def orrery():
+    path = './texture_mapping/orrery'
+    input_yaml_file_path = '{}/orrery.yml'.format(path)
+    output_file_path = '{}/final.ppm'.format(path)
+    if not os.path.exists(path):
+        os.makedirs(path)
+    csg_test(input_yaml_file_path, path)
+    im = Image.open(output_file_path, 'r')
+    im.save(output_file_path[:-3] + 'jpg')
+    im.close()
+
 if __name__ == '__main__':
-    texture_mapping_cylinder()
+    orrery()
     #bounding_box()
     #area_light()
     #import cProfile

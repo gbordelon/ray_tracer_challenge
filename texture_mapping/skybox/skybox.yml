@@ -33,22 +33,22 @@
       mapping: cube
       left:
         type: image
-        file: negx.ppm
+        file: texture_mapping/skybox/negx.jpg
       right:
         type: image
-        file: posx.ppm
+        file: texture_mapping/skybox/posx.jpg
       front:
         type: image
-        file: posz.ppm
+        file: texture_mapping/skybox/posz.jpg
       back:
         type: image
-        file: negz.ppm
+        file: texture_mapping/skybox/negz.jpg
       up:
         type: image
-        file: posy.ppm
+        file: texture_mapping/skybox/posy.jpg
       down:
         type: image
-        file: negy.ppm
+        file: texture_mapping/skybox/negy.jpg
     diffuse: 0
     specular: 0
     ambient: 1

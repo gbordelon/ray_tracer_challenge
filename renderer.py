@@ -810,7 +810,7 @@ def render_multi(cam, world, num_threads=4, timeout_in_seconds=30, file_path='./
         i = 0
         while not future.ready():
             try:
-                future.wait(timeout=timeout_in_seconds)
+                future.get(timeout=timeout_in_seconds)
             except TimeoutError as e:
                 pass
             img = Image.frombytes(mode='RGB', size=(cam.hsize,cam.vsize), data=b"".join([construct_ppm_body(image)]))
@@ -1063,17 +1063,13 @@ def lighting(material, shape, light, point, eyev, normalv, shade_intensity=1.0):
     for position in light.light_surface_points():
         lightv = normalize(position - point)
         light_dot_normal = dot(lightv, normalv)
-        if light_dot_normal < 0:
-            pass
-        else:
+        if light_dot_normal >= 0:
             diffuse = effective_color * material.diffuse * light_dot_normal
             acc += diffuse
 
             reflectv = reflect(-lightv, normalv)
             reflect_dot_eye = dot(reflectv, eyev)
-            if reflect_dot_eye <= 0:
-                pass
-            else:
+            if reflect_dot_eye > 0:
                 factor = np.power(reflect_dot_eye, material.shininess)
                 specular = light.intensity * material.specular * factor
                 acc += specular

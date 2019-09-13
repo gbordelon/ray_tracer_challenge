@@ -81,14 +81,14 @@
     add: csg
     operation: difference
     left:
-      type: cube
+      add: cube
       transform:
       - [ scale, 1, 0.25, 1 ]
       - [ translate, 1, 0, 1 ]
       - [ rotate-y, 0.7854 ]
       - [ scale, 1, 1, 0.1 ]
     right:
-      type: cylinder
+      add: cylinder
       min: -0.26
       max: 0.26
       closed: true
@@ -100,12 +100,12 @@
     add: csg
     operation: difference
     left:
-      type: cylinder
+      add: cylinder
       min: -0.025
       max: 0.025
       closed: true
     right:
-      type: group
+      add: group
       children:
       # center hole
       - add: cylinder
@@ -118,14 +118,14 @@
       - add: csg
         operation: difference
         left:
-          type: cylinder
+          add: cylinder
           min: -0.06
           max: 0.06
           closed: true
           transform:
           - [ scale, 0.7, 1, 0.7 ]
         right:
-          type: cube
+          add: cube
           transform:
           - [ scale, 1, 0.1, 0.2 ]
       # teeth
@@ -195,12 +195,12 @@
   transform:
   - [ rotate-y, -1 ]
   left:
-    type: cylinder
+    add: cylinder
     min: -1.51
     max: -1.5
     closed: true
   right:
-    type: group
+    add: group
     children:
     - add: cylinder
       min: -1.52
@@ -211,14 +211,14 @@
     - add: csg
       operation: difference
       left:
-        type: cylinder
+        add: cylinder
         min: -1.52
         max: -1.49
         closed: true
         transform:
         - [ scale, 0.75, 1, 0.75 ]
       right:
-        type: cube
+        add: cube
         transform:
         - [ scale, 1, 0.1, 0.2 ]
         - [ translate, 0, -1.5, 0 ]
@@ -292,7 +292,7 @@
       mapping: planar
       uv_pattern:
         type: image
-        file: res/wood.ppm
+        file: texture_mapping/orrery/wood.jpg
       transform:
       - [ scale, 0.5, 0.5, 0.5 ]
 
@@ -319,7 +319,7 @@
         mapping: spherical
         uv_pattern:
           type: image
-          file: res/mercury-small.ppm
+          file: texture_mapping/orrery/mercury-small.jpg
   - add: group
     material: GOLD
     children:
@@ -401,7 +401,7 @@
         mapping: spherical
         uv_pattern:
           type: image
-          file: res/earthmap-small.ppm
+          file: texture_mapping/orrery/earthmap-small.jpg
   - add: group
     material: GOLD
     children:
@@ -445,7 +445,7 @@
         mapping: spherical
         uv_pattern:
           type: image
-          file: res/mars-small.ppm
+          file: texture_mapping/orrery/mars-small.jpg
   - add: group
     material: GOLD
     children:
@@ -488,7 +488,7 @@
         mapping: spherical
         uv_pattern:
           type: image
-          file: res/jupitermap-small.ppm
+          file: texture_mapping/orrery/jupitermap-small.jpg
   - add: group
     material: GOLD
     children:
@@ -532,7 +532,7 @@
         mapping: spherical
         uv_pattern:
           type: image
-          file: res/saturnmap-small.ppm
+          file: texture_mapping/orrery/saturnmap-small.jpg
   # rings
   - add: csg
     operation: difference
@@ -547,14 +547,14 @@
         transform:
         - [ scale, 0.05, 1, 0.05 ]
     left:
-      type: cylinder
+      add: cylinder
       min: -0.01
       max: 0.01
       closed: true
       transform:
       - [ scale, 1.2, 1, 1.2 ]
     right:
-      type: cylinder
+      add: cylinder
       min: -0.02
       max: 0.02
       closed: true
@@ -603,7 +603,7 @@
         mapping: spherical
         uv_pattern:
           type: image
-          file: res/uranusmap-small.ppm
+          file: texture_mapping/orrery/uranusmap-small.jpg
   - add: group
     material: GOLD
     children:
@@ -646,7 +646,7 @@
         mapping: spherical
         uv_pattern:
           type: image
-          file: res/neptunemap-small.ppm
+          file: texture_mapping/orrery/neptunemap-small.jpg
   - add: group
     material: GOLD
     children:
@@ -677,7 +677,7 @@
       mapping: spherical
       uv_pattern:
         type: image
-        file: res/artist_workshop.ppm
+        file: texture_mapping/orrery/artist_workshop.png
       transform:
       - [ rotate-y, -2.7 ]
     diffuse: 0

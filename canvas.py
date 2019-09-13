@@ -1,5 +1,9 @@
 import numpy as np
 from multiprocessing import sharedctypes
+from PIL import Image
+from functools import lru_cache
+
+CACHE_SIZE = 65536
 
 def color(r, g, b):
     """
@@ -32,6 +36,23 @@ def color(r, g, b):
     """
     return np.array([r,g,b], dtype=np.float64)
 
+
+class TextureCanvas(object):
+    def __init__(self, file_path):
+        self.file_path = file_path
+        self.img = Image.open(file_path, 'r')
+        self.pixels = np.array(self.img)
+        self.scaling_factor = np.float64(np.max(self.pixels))
+        self.width = self.pixels.shape[1]
+        self.height = self.pixels.shape[0]
+
+    @lru_cache(maxsize=CACHE_SIZE)
+    def pixel_at(self, x, y):
+        raw_color = self.pixels[x, y]
+        r = np.float64(raw_color[0]) / self.scaling_factor
+        g = np.float64(raw_color[1]) / self.scaling_factor
+        b = np.float64(raw_color[2]) / self.scaling_factor
+        return color(r, g, b)
 
 class Canvas(object):
     def __init__(self, width, height):
@@ -108,21 +129,33 @@ def construct_ppm_header(canvas):
 255
 """.format(canvas.shape[0], canvas.shape[1])
 
-def construct_ppm_body(canvas):
+def construct_ppm_body(canvas, default_clamping=True):
     body = bytearray()
+    max_component = 1.0
+
+    if not default_clamping:
+        if type(canvas) == np.ndarray:
+            max_component = np.max(canvas)
+        elif type(canvas) == Canvas:
+            max_component = np.max(np.ctypeslib.as_array(canvas.shared_arr))
+        else:
+            print(type(canvas))
+            max_component = 1.0
+
+    print('max color component value: {}'.format(max_component))
     for y in range(canvas.shape[1]):
         for x in range(canvas.shape[0]):
             for component in canvas[x, y]:
-                if component >= 1.0:
+                if component >= max_component:
                     scaled = 255
                 elif component <= 0:
                     scaled = 0
                 else:
-                    scaled = (component * 255 + 0.5).astype(int)
+                    scaled = (component * 255 / max_component + 0.5).astype(int)
                 body.append(scaled)
     return body
 
-def construct_ppm(canvas):
+def construct_ppm(canvas, default_clamping=True):
     """
     >>> ca = canvas(5,3)
     >>> c1 = color(1.5,0,0)
@@ -143,7 +176,7 @@ def construct_ppm(canvas):
     True
     """
     header = construct_ppm_header(canvas)
-    body = construct_ppm_body(canvas)
+    body = construct_ppm_body(canvas, default_clamping)
     body.append(10)
     return b"".join([header.encode('utf-8'),body])
 

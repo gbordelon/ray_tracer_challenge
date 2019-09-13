@@ -345,7 +345,10 @@ class CSG(Shape):
         else:
             raise ValueError('Malformed CSG yaml', tree)
 
-        op_obj = tree['op']
+        if 'op' in tree:
+            op_obj = tree['op']
+        else:
+            op_obj = tree['operation']
         if op_obj == 'difference':
             op = CSGDifference
         elif op_obj == 'intersection':
@@ -475,7 +478,7 @@ class Group(Shape):
         return box
 
     def divide(self, threshold):
-        if threshold <= len(self.children):
+        if threshold < len(self.children):
             left, right = self._partition_children()
             if len(left) > 0:
                 self._make_subgroup(left)
@@ -1509,7 +1512,7 @@ class Pattern(object):
             color1 = color(*obj['colors'][0])
             color2 = color(*obj['colors'][1])
             return RadialGradient(color1=color1, color2=color2)
-        elif typ == 'ring':
+        elif typ == 'rings':
             color1 = color(*obj['colors'][0])
             color2 = color(*obj['colors'][1])
             return Ring(color1=color1, color2=color2)
@@ -1587,7 +1590,8 @@ class Pattern(object):
                                 bottom_left=colors['bl'],
                                 bottom_right=colors['br'])
         elif typ == 'image':
-            raise NotImplementedError('I still need to implement uv image mapping.')
+            file_path = obj['file']
+            return UVTexturePattern(tcanvas=TextureCanvas(file_path))
 
         raise ValueError('Unable to parse uv pattern type: {}'.format(typ))
 
@@ -1666,8 +1670,15 @@ class Pattern(object):
 class SphereUVMap(object):
     @classmethod
     def uv_map(cls, object_point) -> 'tuple':
-        u = 0.5 + np.arctan2(object_point[2], object_point[0]) / (2 * np.pi)
-        v = 0.5 - np.arcsin(object_point[1]) / np.pi
+        #u = 0.5 + np.arctan2(object_point[2], object_point[0]) / (2 * np.pi)
+        #v = 0.5 - np.arcsin(object_point[1]) / np.pi
+        theta = np.arctan2(object_point[0], object_point[2])
+        vec = vector(object_point[0], object_point[1], object_point[2])
+        radius = magnitude(vec)
+        phi = np.arccos(object_point[1] / radius)
+        raw_u = theta / (2 * np.pi)
+        u = 1 - (raw_u + 0.5)
+        v = 1 - phi / np.pi
         return u,v
 
 
@@ -1929,6 +1940,18 @@ class UVAlignCheck(Pattern):
                 return self.br
 
         return self.main
+
+
+class UVTexturePattern(Pattern):
+    def __init__(self, tcanvas):
+        Pattern.__init__(self, WHITE, BLACK)
+        self.canvas = tcanvas
+
+    def uv_pattern_at(self, u, v):
+        v = 1 - v
+        y = u * (self.canvas.width - 1)
+        x = v * (self.canvas.height - 1)
+        return self.canvas.pixel_at(np.round(x).astype('int'), np.round(y).astype('int'))
 
 
 #######################
