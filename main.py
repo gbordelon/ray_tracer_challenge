@@ -350,7 +350,7 @@ def bounding_box():
         os.makedirs(output_dir_path)
     csg_test(input_yaml_file_path, output_dir_path)
     im = Image.open(output_dir_path, 'r')
-    im.save(output_dir_path + output_file_name[:-3] + 'jpg')
+    im.save(output_file_name[:-3] + 'jpg')
     im.close()
 
 def area_light():
@@ -365,8 +365,8 @@ def area_light():
     im.close()
 
 if __name__ == '__main__':
-    bounding_box()
-    #area_light()
+    #bounding_box()
+    area_light()
     #import cProfile
     #cProfile.run('csg_test(input_yaml_file_path, output_file_path)', sort='tottime')
 

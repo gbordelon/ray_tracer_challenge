@@ -9,15 +9,14 @@
 # =========================================================
 
 - add: camera
-  width: 400
-  height: 160
+  width: 1200
+  height: 480
   field-of-view: 0.7854
   from: [-3, 1, 2.5]
   to: [0, 0.5, 0]
   up: [0, 1, 0]
 
 - add: light
-  #at: [-1, 2, 4]
   corner: [-1, 2, 4]
   uvec: [2, 0, 0]
   vvec: [0, 2, 0]
