@@ -302,7 +302,7 @@ def yaml_test(yaml_file_name, output_file_name):
     with open(output_file_name + 'ppm', 'wb') as f:
         f.write(ppm)
 
-def csg_test(yaml_file_path, output_dir_path):
+def main_from_yaml(yaml_file_path, output_dir_path):
     from yaml_parser import yaml_file_to_world_objects
 
     w = default_world()
@@ -320,7 +320,8 @@ def csg_test(yaml_file_path, output_dir_path):
     posix_timestamp_micros_before = (now - epoch) / timedelta(microseconds=1)
 
     print('Bounding volume construction start at {}'.format(now))
-    gs[0].divide(1)
+
+    gs[0].divide(yaml_objs['config'].divide_threshold)
     w.contains.extend(yaml_objs['world'])
 
     now = datetime.now(timezone.utc)
@@ -330,7 +331,12 @@ def csg_test(yaml_file_path, output_dir_path):
     print('Bounding volume constructed in {} seconds'.format(delta/1000000))
 
     print('canvas construction start at {}'.format(now))
-    ca = render_multi(cam, w, 4, 30, output_dir_path)
+    ca = render_multi(cam=cam,
+                      world=w,
+                      num_threads=yaml_objs['config'].thread_count,
+                      timeout_in_seconds=yaml_objs['config'].timeout,
+                      file_path=output_dir_path,
+                      clamping=yaml_objs['config'].clamping)
     #ca = render(cam, w)
 
     now = datetime.now(timezone.utc)
@@ -350,10 +356,10 @@ def csg_test(yaml_file_path, output_dir_path):
 def bounding_box():
     output_dir_path = './bounding_box_images'
     input_yaml_file_path = '{}/bounding_boxes.yml'.format(output_dir_path)
-    output_file_name = '{}/final.ppm'.format(output_dir_path)
+    output_file_name = '{}/final_try1.ppm'.format(output_dir_path)
     if not os.path.exists(output_dir_path):
         os.makedirs(output_dir_path)
-    csg_test(input_yaml_file_path, output_dir_path)
+    main_from_yaml(input_yaml_file_path, output_dir_path)
     im = Image.open(output_dir_path, 'r')
     im.save(output_file_name[:-3] + 'jpg')
     im.close()
@@ -361,10 +367,10 @@ def bounding_box():
 def area_light():
     output_path = './shadow_glamour_shot'
     input_yaml_file_path = '{}/shadow_glamour_shot.yml'.format(output_path)
-    output_file_path = '{}/final.ppm'.format(output_path)
+    output_file_path = '{}/final_try1.ppm'.format(output_path)
     if not os.path.exists(output_path):
         os.makedirs(output_path)
-    csg_test(input_yaml_file_path, output_path)
+    main_from_yaml(input_yaml_file_path, output_path)
     im = Image.open(output_file_path, 'r')
     im.save(output_file_path[:-3] + 'jpg')
     im.close()
@@ -372,10 +378,10 @@ def area_light():
 def texture_mapping_sphere():
     path = './texture_mapping/checkered_sphere'
     input_yaml_file_path = '{}/checkered_sphere.yml'.format(path)
-    output_file_path = '{}/final.ppm'.format(path)
+    output_file_path = '{}/final_try1.ppm'.format(path)
     if not os.path.exists(path):
         os.makedirs(path)
-    csg_test(input_yaml_file_path, path)
+    main_from_yaml(input_yaml_file_path, path)
     im = Image.open(output_file_path, 'r')
     im.save(output_file_path[:-3] + 'jpg')
     im.close()
@@ -383,10 +389,10 @@ def texture_mapping_sphere():
 def texture_mapping_plane():
     path = './texture_mapping/checkered_plane'
     input_yaml_file_path = '{}/checkered_plane.yml'.format(path)
-    output_file_path = '{}/final.ppm'.format(path)
+    output_file_path = '{}/final_try1.ppm'.format(path)
     if not os.path.exists(path):
         os.makedirs(path)
-    csg_test(input_yaml_file_path, path)
+    main_from_yaml(input_yaml_file_path, path)
     im = Image.open(output_file_path, 'r')
     im.save(output_file_path[:-3] + 'jpg')
     im.close()
@@ -394,10 +400,10 @@ def texture_mapping_plane():
 def texture_mapping_cylinder():
     path = './texture_mapping/checkered_cylinder'
     input_yaml_file_path = '{}/checkered_cylinder.yml'.format(path)
-    output_file_path = '{}/final.ppm'.format(path)
+    output_file_path = '{}/final_try1.ppm'.format(path)
     if not os.path.exists(path):
         os.makedirs(path)
-    csg_test(input_yaml_file_path, path)
+    main_from_yaml(input_yaml_file_path, path)
     im = Image.open(output_file_path, 'r')
     im.save(output_file_path[:-3] + 'jpg')
     im.close()
@@ -405,10 +411,10 @@ def texture_mapping_cylinder():
 def texture_mapping_cube():
     path = './texture_mapping/checkered_cube'
     input_yaml_file_path = '{}/checkered_cube.yml'.format(path)
-    output_file_path = '{}/final.ppm'.format(path)
+    output_file_path = '{}/final_try1.ppm'.format(path)
     if not os.path.exists(path):
         os.makedirs(path)
-    csg_test(input_yaml_file_path, path)
+    main_from_yaml(input_yaml_file_path, path)
     im = Image.open(output_file_path, 'r')
     im.save(output_file_path[:-3] + 'jpg')
     im.close()
@@ -416,10 +422,10 @@ def texture_mapping_cube():
 def texture_mapping_image():
     path = './texture_mapping/earth'
     input_yaml_file_path = '{}/earth.yml'.format(path)
-    output_file_path = '{}/final.ppm'.format(path)
+    output_file_path = '{}/final_try1.ppm'.format(path)
     if not os.path.exists(path):
         os.makedirs(path)
-    csg_test(input_yaml_file_path, path)
+    main_from_yaml(input_yaml_file_path, path)
     im = Image.open(output_file_path, 'r')
     im.save(output_file_path[:-3] + 'jpg')
     im.close()
@@ -427,10 +433,10 @@ def texture_mapping_image():
 def skybox():
     path = './texture_mapping/skybox'
     input_yaml_file_path = '{}/skybox.yml'.format(path)
-    output_file_path = '{}/final.ppm'.format(path)
+    output_file_path = '{}/final_try1.ppm'.format(path)
     if not os.path.exists(path):
         os.makedirs(path)
-    csg_test(input_yaml_file_path, path)
+    main_from_yaml(input_yaml_file_path, path)
     im = Image.open(output_file_path, 'r')
     im.save(output_file_path[:-3] + 'jpg')
     im.close()
@@ -438,10 +444,10 @@ def skybox():
 def orrery():
     path = './texture_mapping/orrery'
     input_yaml_file_path = '{}/orrery.yml'.format(path)
-    output_file_path = '{}/final.ppm'.format(path)
+    output_file_path = '{}/final_try1.ppm'.format(path)
     if not os.path.exists(path):
         os.makedirs(path)
-    csg_test(input_yaml_file_path, path)
+    main_from_yaml(input_yaml_file_path, path)
     im = Image.open(output_file_path, 'r')
     im.save(output_file_path[:-3] + 'jpg')
     im.close()
@@ -451,5 +457,5 @@ if __name__ == '__main__':
     #bounding_box()
     #area_light()
     #import cProfile
-    #cProfile.run('csg_test(input_yaml_file_path, output_file_path)', sort='tottime')
+    #cProfile.run('orrery()', sort='tottime')
 

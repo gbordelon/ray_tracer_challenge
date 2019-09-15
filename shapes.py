@@ -1491,35 +1491,39 @@ BLACK = color(0,0,0)
 WHITE = color(1,1,1)
 
 class Pattern(object):
-    def __init__(self, color1=WHITE, color2=BLACK):
-        self.transform = matrix4x4identity()
+    def __init__(self, color1=WHITE, color2=BLACK, transform=matrix4x4identity()):
+        self.transform = transform
         self.a = color1
         self.b = color2
 
     @classmethod
     def from_yaml(cls, obj) -> 'Pattern':
+        xform = matrix4x4identity()
+        if 'transform' in obj:
+            xform = Transform.from_yaml(obj['transform'])
+
         typ = obj['type']
         # base patterns
         if typ == 'checkers':
             color1 = color(*obj['colors'][0])
             color2 = color(*obj['colors'][1])
-            return Checkers(color1=color1, color2=color2)
+            return Checkers(color1=color1, color2=color2, transform=xform)
         elif typ == 'gradient':
             color1 = color(*obj['colors'][0])
             color2 = color(*obj['colors'][1])
-            return Gradient(color1=color1, color2=color2)
+            return Gradient(color1=color1, color2=color2, transform=xform)
         elif typ == 'radial-gradient':
             color1 = color(*obj['colors'][0])
             color2 = color(*obj['colors'][1])
-            return RadialGradient(color1=color1, color2=color2)
+            return RadialGradient(color1=color1, color2=color2, transform=xform)
         elif typ == 'rings':
             color1 = color(*obj['colors'][0])
             color2 = color(*obj['colors'][1])
-            return Ring(color1=color1, color2=color2)
+            return Ring(color1=color1, color2=color2, transform=xform)
         elif typ == 'stripe':
             color1 = color(*obj['colors'][0])
             color2 = color(*obj['colors'][1])
-            return Stripe(color1=color1, color2=color2)
+            return Stripe(color1=color1, color2=color2, transform=xform)
 
         # nested patterns
         elif typ == 'blended':
@@ -1565,13 +1569,16 @@ class Pattern(object):
                     uv_body = Pattern.uv_from_yaml(obj['front'])
                 return CylinderMapPattern(uv_cap=uv_cap,
                                           uv_body=uv_body,
-                                          uv_map=CylinderUVMap)
+                                          uv_map=CylinderUVMap,
+                                          transform=xform)
             elif mapping == 'planar':
                 return TextureMapPattern(uv_pattern=Pattern.uv_from_yaml(obj['uv_pattern']),
-                                         uv_map=PlaneUVMap)
+                                         uv_map=PlaneUVMap,
+                                         transform=xform)
             elif mapping == 'spherical':
                 return TextureMapPattern(uv_pattern=Pattern.uv_from_yaml(obj['uv_pattern']),
-                                         uv_map=SphereUVMap)
+                                         uv_map=SphereUVMap,
+                                         transform=xform)
         raise ValueError('Unable to parse pattern type: {}'.format(typ))
 
     @classmethod
@@ -1672,7 +1679,7 @@ class SphereUVMap(object):
     def uv_map(cls, object_point) -> 'tuple':
         #u = 0.5 + np.arctan2(object_point[2], object_point[0]) / (2 * np.pi)
         #v = 0.5 - np.arcsin(object_point[1]) / np.pi
-        theta = np.arctan2(object_point[0], object_point[2])
+        theta = np.arctan2(object_point[0], object_point[2]) # TODO swap x and y?
         vec = vector(object_point[0], object_point[1], object_point[2])
         radius = magnitude(vec)
         phi = np.arccos(object_point[1] / radius)
@@ -1696,6 +1703,16 @@ class CylinderUVMap(object):
 
     @classmethod
     def _face_from_point(cls, pt):
+        radius = np.sqrt(pt[0] ** 2 + pt[2] ** 2)
+        abs_y = abs(pt[1])
+        coord = max(radius, abs_y)
+
+        if coord == radius: # face
+            return 0
+        elif coord == abs_y: # top cap
+            return 1
+        elif coord == -abs_y: # bottom cap
+            return 1
         return 0
 
     @classmethod
@@ -1805,8 +1822,8 @@ class CubeUVMap(object):
 #
 #######################
 class TextureMapPattern(Pattern):
-    def __init__(self, uv_pattern, uv_map):
-        Pattern.__init__(self, uv_pattern.a, uv_pattern.b)
+    def __init__(self, uv_pattern, uv_map, transform):
+        Pattern.__init__(self, uv_pattern.a, uv_pattern.b, transform)
         self.uv_pattern = uv_pattern
         self.uv_map = uv_map
 
@@ -1815,8 +1832,8 @@ class TextureMapPattern(Pattern):
 
 
 class CubeMapPattern(Pattern):
-    def __init__(self, uv_left, uv_front, uv_right, uv_back, uv_up, uv_down, uv_map):
-        Pattern.__init__(self, WHITE, BLACK)
+    def __init__(self, uv_left, uv_front, uv_right, uv_back, uv_up, uv_down, uv_map, transform):
+        Pattern.__init__(self, WHITE, BLACK, transform)
         self.faces = [uv_right, uv_left, uv_up, uv_down, uv_front, uv_back] # order matters
         self.uv_map = uv_map
 
@@ -1826,8 +1843,8 @@ class CubeMapPattern(Pattern):
 
 
 class CylinderMapPattern(Pattern):
-    def __init__(self, uv_cap, uv_body, uv_map):
-        Pattern.__init__(self, WHITE, BLACK)
+    def __init__(self, uv_cap, uv_body, uv_map, transform):
+        Pattern.__init__(self, WHITE, BLACK, transform)
         self.faces = [uv_body, uv_cap] # order matters
         self.uv_map = uv_map
 
@@ -1960,8 +1977,8 @@ class UVTexturePattern(Pattern):
 #
 #######################
 class Checkers(Pattern):
-    def __init__(self, color1=WHITE, color2=BLACK):
-        Pattern.__init__(self, color1, color2)
+    def __init__(self, color1=WHITE, color2=BLACK, transform=matrix4x4identity()):
+        Pattern.__init__(self, color1, color2, transform)
 
     def pattern_at(self, pattern_point):
         new_point = np.floor(pattern_point.arr)
@@ -1970,8 +1987,8 @@ class Checkers(Pattern):
 
 
 class Gradient(Pattern):
-    def __init__(self, color1=WHITE, color2=BLACK):
-        Pattern.__init__(self, color1, color2)
+    def __init__(self, color1=WHITE, color2=BLACK, transform=matrix4x4identity()):
+        Pattern.__init__(self, color1, color2, transform)
 
     def pattern_at(self, pattern_point):
         distance = self.b - self.a
@@ -1980,8 +1997,8 @@ class Gradient(Pattern):
 
 
 class RadialGradient(Pattern):
-    def __init__(self, color1=WHITE, color2=BLACK):
-        Pattern.__init__(self, color1, color2)
+    def __init__(self, color1=WHITE, color2=BLACK, transform=matrix4x4identity()):
+        Pattern.__init__(self, color1, color2, transform)
 
     def pattern_at(self, pattern_point):
         color_a = self._get_color_1()
@@ -1992,8 +2009,8 @@ class RadialGradient(Pattern):
 
 
 class Ring(Pattern):
-    def __init__(self, color1=WHITE, color2=BLACK):
-        Pattern.__init__(self, color1, color2)
+    def __init__(self, color1=WHITE, color2=BLACK, transform=matrix4x4identity()):
+        Pattern.__init__(self, color1, color2, transform)
 
     def pattern_at(self, pattern_point):
         return self._predicate_eval(
@@ -2001,8 +2018,8 @@ class Ring(Pattern):
 
 
 class Stripe(Pattern):
-    def __init__(self, color1=WHITE, color2=BLACK):
-        Pattern.__init__(self, color1, color2)
+    def __init__(self, color1=WHITE, color2=BLACK, transform=matrix4x4identity()):
+        Pattern.__init__(self, color1, color2, transform)
 
     def pattern_at(self, pattern_point):
         return self._predicate_eval(np.floor(pattern_point[0]) % 2 == 0)

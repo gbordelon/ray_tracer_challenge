@@ -95,7 +95,8 @@ def pixel_at(canvas, x, y):
     return canvas[x, y]
 
 def write_pixels(canvas, block, x_start, y_start, shape):
-    canvas[x_start:x_start+shape, y_start:y_start+shape] = block
+    arr = np.ctypeslib.as_array(canvas.shared_arr)
+    arr[x_start:x_start+shape, y_start:y_start+shape] = block
 
 def write_pixel(canvas, x, y, color):
     """
@@ -129,7 +130,7 @@ def construct_ppm_header(canvas):
 255
 """.format(canvas.shape[0], canvas.shape[1])
 
-def construct_ppm_body(canvas, default_clamping=True):
+def construct_ppm_body(canvas, default_clamping=False):
     body = bytearray()
     max_component = 1.0
 
@@ -142,7 +143,6 @@ def construct_ppm_body(canvas, default_clamping=True):
             print(type(canvas))
             max_component = 1.0
 
-    print('max color component value: {}'.format(max_component))
     for y in range(canvas.shape[1]):
         for x in range(canvas.shape[0]):
             for component in canvas[x, y]:

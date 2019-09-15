@@ -1,6 +1,7 @@
 from renderer import Camera, Light
 from shapes import Shape, Group, Material
 from matrix import matrix4x4identity
+from config import GlobalConfig
 
 from copy import deepcopy
 import yaml
@@ -16,7 +17,8 @@ def yaml_file_to_world_objects(file_path):
 
     rv = {'camera':None,
           'lights':[],
-          'world':[]}
+          'world':[],
+          'config':None}
 
     defines = {}
     extends_map = {}
@@ -50,6 +52,8 @@ def yaml_file_to_world_objects(file_path):
                 rv['camera'] = Camera.from_yaml(obj)
             elif obj["add"] == "light":
                 rv['lights'].append(Light.from_yaml(obj))
+            elif obj['add'] == 'config':
+                rv['config'] = GlobalConfig.from_yaml(obj['add'])
             else:
                 possible_item = recursive_add(obj, defines)
                 if possible_item is not None:

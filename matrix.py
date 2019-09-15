@@ -3,7 +3,7 @@ from vector import *
 from functools import lru_cache
 import numpy as np
 
-CACHE_SIZE=65536
+CACHE_SIZE=16384
 
 class ImmutableMatrix(object):
     def __init__(self, ndarr):

@@ -6,10 +6,11 @@ from vector import *
 import shapes
 
 import itertools
-from multiprocessing import Pool
+from multiprocessing import Pool, TimeoutError
 import numpy as np
 from PIL import Image
 from random import shuffle
+from datetime import datetime, timezone
 
 EPSILON = 0.000001
 BLOCK_SIZE=2
@@ -761,21 +762,27 @@ def render(cam, world):
     >>> np.isclose(pixel_at(image, 5, 5), color(0.38066119, 0.47582649, 0.28549589))
     array([ True,  True,  True])
     """
+    i = 0
     image = canvas(cam.hsize, cam.vsize)
     for y in range(cam.vsize):
         for x in range(cam.hsize):
             r = ray_for_pixel(cam, x, y)
             c = color_at(world, r)
             write_pixel(image, x, y, c)
+        i += 1
+        print('wrote {} rows out of {}'.format(i, cam.vsize))
 
     return image
 
+global_image = []
 # https://jonasteuwen.github.io/numpy/python/multiprocessing/2017/01/07/multiprocessing-numpy-array.html
 # http://thousandfold.net/cz/2014/05/01/sharing-numpy-arrays-between-processes-using-multiprocessing-and-ctypes/
 # Pool size 4 on raspberry pi 3b+
 def render_multi_helper(args):
     cam, world, window_x, window_y = args
 
+    global image
+    image = global_image
     buffer = np.zeros((BLOCK_SIZE, BLOCK_SIZE, 3))
     for idx_x in range(window_x, window_x + BLOCK_SIZE):
         for idx_y in range(window_y, window_y + BLOCK_SIZE):
@@ -783,9 +790,9 @@ def render_multi_helper(args):
             c = color_at(world, r)
             buffer[idx_x-window_x, idx_y-window_y] = c
 
-    write_pixels(image, buffer, window_x, window_y, BLOCK_SIZE)
+    write_pixels(image[0], buffer, window_x, window_y, BLOCK_SIZE)
 
-def render_multi(cam, world, num_threads=4, timeout_in_seconds=30, file_path='./'):
+def render_multi(cam, world, num_threads=4, timeout_in_seconds=30, file_path='./', clamping=False):
     """
     >>> w = default_world()
     >>> c = camera(11, 11, np.pi/2)
@@ -797,8 +804,10 @@ def render_multi(cam, world, num_threads=4, timeout_in_seconds=30, file_path='./
     >>> np.isclose(pixel_at(image, 5, 5), color(0.38066119, 0.47582649, 0.28549589))
     array([ True,  True,  True])
     """
-    global image
+    global global_image
+
     image = canvas(cam.hsize, cam.vsize)
+    global_image.append(image)
     window_idxs = [(cam, world, i, j) for i, j in
                    itertools.product(range(0, cam.hsize, BLOCK_SIZE),
                                      range(0, cam.vsize, BLOCK_SIZE))]
@@ -810,13 +819,18 @@ def render_multi(cam, world, num_threads=4, timeout_in_seconds=30, file_path='./
         i = 0
         while not future.ready():
             try:
-                future.get(timeout=timeout_in_seconds)
-            except TimeoutError as e:
+                future.wait(timeout=timeout_in_seconds)
+            except TimeoutError:
                 pass
-            img = Image.frombytes(mode='RGB', size=(cam.hsize,cam.vsize), data=b"".join([construct_ppm_body(image)]))
+            now = datetime.now(timezone.utc)
+            print('saving partial image at {}'.format(now))
+            img = Image.frombytes(mode='RGB', size=(cam.hsize,cam.vsize), data=b"".join([construct_ppm_body(image, clamping)]))
             img.save('{}/{}.png'.format(file_path, i))
             img.close()
+            now = datetime.now(timezone.utc)
+            print('saved at {}\n'.format(now))
             i += 1
+        future.get()
 
     return np.ctypeslib.as_array(image.shared_arr)
 
