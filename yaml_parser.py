@@ -53,7 +53,7 @@ def yaml_file_to_world_objects(file_path):
             elif obj["add"] == "light":
                 rv['lights'].append(Light.from_yaml(obj))
             elif obj['add'] == 'config':
-                rv['config'] = GlobalConfig.from_yaml(obj['add'])
+                rv['config'] = GlobalConfig.from_yaml(obj)
             else:
                 possible_item = recursive_add(obj, defines)
                 if possible_item is not None:
