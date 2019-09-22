@@ -1,3 +1,9 @@
+- add: config
+  thread-count: 4
+  timeout: 600 # in seconds
+  divide-threshold: 1
+  clamping: False
+
 - add: camera
   width: 400
   height: 400

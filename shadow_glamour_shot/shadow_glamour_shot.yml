@@ -1,3 +1,9 @@
+- add: config
+  thread-count: 4
+  timeout: 180 # in seconds
+  divide-threshold: 1
+  clamping: False
+
 # =========================================================
 # shadow-glamour-shot.yml
 #
