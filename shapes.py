@@ -371,7 +371,7 @@ class CSG(Shape):
             return self.filter_intersections(xs)
         return []
 
-    # assume xs is already filtered
+    # assume xs is already sorted
     def filter_intersections(self, xs):
         inl = False
         inr = False
@@ -681,7 +681,7 @@ class Cone(Shape):
             return vector(0,-1,0)
 
         y = np.sqrt(dist)
-        if local_point[0] > 0:
+        if local_point[1] > 0:
             y = -y
 
         return vector(local_point[0], y, local_point[2])
@@ -855,7 +855,7 @@ class SmoothTriangle(Shape):
         self.e2 = p3 - p1
 
     def local_normal_at(self, local_point, hit):
-        return self.n2 * hit.u + self.n3 * hit.v +  self.n1 * (1 - hit.u - hit.v)
+        return self.n2 * hit.u + self.n3 * hit.v + self.n1 * (1 - hit.u - hit.v)
 
     def local_intersect(self, r):
         dir_cross_e2 = cross(r.direction, self.e2)
@@ -1233,7 +1233,7 @@ def plane():
     >>> len(xs) == 1 and np.isclose(xs[0].t,1) and xs[0].object == p
     True
     """
-    return Plane()
+    return Plane(Material(), matrix4x4identity())
 
 def ray(o, d):
     """
@@ -1264,6 +1264,14 @@ def position(ray, t):
     True
     """
     return ray.origin + ray.direction * t
+
+def cylinder():
+    """
+    >>> s = sphere()
+    >>> s.transform.compare(matrix4x4identity())
+    True
+    """
+    return Cylinder(material(), matrix4x4identity())
 
 def sphere():
     """

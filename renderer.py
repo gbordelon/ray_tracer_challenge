@@ -520,9 +520,9 @@ def shade_hit(world, comps, remaining=5):
     mat = comps.object.material
     if mat.reflective > 0 and mat.transparency > 0:
         reflectance = schlick(comps)
-        surface += surface + reflected * reflectance + refracted * (1.0 - reflectance)
+        surface += reflected * reflectance + refracted * (1.0 - reflectance)
     else:
-        surface += surface + reflected + refracted
+        surface += reflected + refracted
     return surface
 
 def is_shadowed(world, light_position, point):

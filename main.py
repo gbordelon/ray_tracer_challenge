@@ -389,7 +389,7 @@ def texture_mapping_sphere():
 def texture_mapping_plane():
     path = './texture_mapping/checkered_plane'
     input_yaml_file_path = '{}/checkered_plane.yml'.format(path)
-    output_file_path = '{}/final_try1.ppm'.format(path)
+    output_file_path = '{}/final.ppm'.format(path)
     if not os.path.exists(path):
         os.makedirs(path)
     main_from_yaml(input_yaml_file_path, path)
@@ -444,7 +444,7 @@ def skybox():
 def orrery():
     path = './texture_mapping/orrery'
     input_yaml_file_path = '{}/orrery.yml'.format(path)
-    output_file_path = '{}/final_try1.ppm'.format(path)
+    output_file_path = '{}/final.ppm'.format(path)
     if not os.path.exists(path):
         os.makedirs(path)
     main_from_yaml(input_yaml_file_path, path)
@@ -453,7 +453,8 @@ def orrery():
     im.close()
 
 if __name__ == '__main__':
-    orrery()
+    #orrery()
+    texture_mapping_plane()
     #bounding_box()
     #area_light()
     #import cProfile
